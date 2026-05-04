@@ -27,7 +27,7 @@
       resize: vertical;
     }
 
-    .controls { margin-bottom: 12px; }
+    .controls { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
     button {
       background: #2563eb;
       color: #fff;
@@ -38,6 +38,8 @@
       border-radius: 4px;
     }
     button:hover { background: #1d4ed8; }
+    .tolerance-row { font-size: 0.75rem; color: #888; display: flex; align-items: center; gap: 8px; }
+    .tolerance-row input { width: 60px; background: #111; color: #eee; border: 1px solid #333; padding: 4px; }
 
     .renders {
       display: grid;
@@ -48,6 +50,21 @@
     .render-box label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; }
     canvas { display: block; width: 100%; border: 1px solid #333; image-rendering: pixelated; }
 
+    #scorePanel {
+      background: #111;
+      border: 1px solid #333;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 0.8rem;
+      display: none;
+    }
+    #scorePanel.visible { display: block; }
+    #scorePanel .score-value { font-size: 1.4rem; font-weight: bold; }
+    #scorePanel .score-value.high { color: #4ade80; }
+    #scorePanel .score-value.mid  { color: #facc15; }
+    #scorePanel .score-value.low  { color: #f87171; }
+    #scorePanel .breakdown { margin-top: 6px; color: #888; font-size: 0.75rem; }
+
     #errors {
       background: #2a0000;
       border: 1px solid #600;
@@ -55,14 +72,13 @@
       font-size: 0.75rem;
       color: #f88;
       white-space: pre-wrap;
-      min-height: 32px;
       display: none;
     }
     #errors.visible { display: block; }
   </style>
 </head>
 <body>
-  <h1>LeetShaders — Judge Harness (Step 3: visual render)</h1>
+  <h1>LeetShaders — Judge Harness</h1>
 
   <div class="editors">
     <div>
@@ -77,6 +93,15 @@
 
   <div class="controls">
     <button id="renderBtn">Render</button>
+    <button id="scoreBtn">Score (MAE)</button>
+    <span class="tolerance-row">
+      tolerance: <input id="tolerance" type="number" value="10" min="0.1" step="0.5" />
+    </span>
+  </div>
+
+  <div id="scorePanel">
+    <div>MAE score: <span id="scoreValue" class="score-value">—</span></div>
+    <div class="breakdown" id="scoreBreakdown"></div>
   </div>
 
   <div class="renders">
@@ -94,6 +119,7 @@
 
   <script type="module">
     import { compileShader, render, CANVAS_SIZE } from '../pipeline.ts';
+    import { computeMAEResult } from '../mae.ts';
 
     const DEFAULT_USER = `#version 300 es
 precision highp float;
@@ -116,18 +142,25 @@ void main() {
     document.getElementById('userShader').value = DEFAULT_USER;
     document.getElementById('refShader').value = DEFAULT_REF;
 
-    function blitToCanvas(pixels, canvasId) {
-      const canvas = document.getElementById(canvasId);
-      const ctx = canvas.getContext('2d');
-      const imageData = new ImageData(new Uint8ClampedArray(pixels), CANVAS_SIZE, CANVAS_SIZE);
-      // WebGL readPixels returns bottom-up rows; flip vertically before display
+    // Buffers from the last render, used by the score button
+    let lastUserBuf = null;
+    let lastRefBuf  = null;
+
+    function flipY(pixels) {
+      // WebGL readPixels returns rows bottom-up; flip for correct display
       const flipped = new Uint8ClampedArray(CANVAS_SIZE * CANVAS_SIZE * 4);
       for (let row = 0; row < CANVAS_SIZE; row++) {
         const src = (CANVAS_SIZE - 1 - row) * CANVAS_SIZE * 4;
         const dst = row * CANVAS_SIZE * 4;
         flipped.set(pixels.subarray(src, src + CANVAS_SIZE * 4), dst);
       }
-      ctx.putImageData(new ImageData(flipped, CANVAS_SIZE, CANVAS_SIZE), 0, 0);
+      return flipped;
+    }
+
+    function blitToCanvas(pixels, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      ctx.putImageData(new ImageData(flipY(pixels), CANVAS_SIZE, CANVAS_SIZE), 0, 0);
     }
 
     function showError(msg) {
@@ -144,25 +177,48 @@ void main() {
 
     document.getElementById('renderBtn').addEventListener('click', () => {
       clearErrors();
+      document.getElementById('scorePanel').classList.remove('visible');
+      lastUserBuf = null;
+      lastRefBuf  = null;
+
       const userSrc = document.getElementById('userShader').value;
-      const refSrc = document.getElementById('refShader').value;
+      const refSrc  = document.getElementById('refShader').value;
       const errs = [];
 
       const userResult = compileShader(userSrc);
       if ('type' in userResult) {
         errs.push('YOUR SHADER:\n' + userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
       } else {
-        blitToCanvas(render(userResult), 'userCanvas');
+        lastUserBuf = render(userResult);
+        blitToCanvas(lastUserBuf, 'userCanvas');
       }
 
       const refResult = compileShader(refSrc);
       if ('type' in refResult) {
         errs.push('REFERENCE SHADER:\n' + refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
       } else {
-        blitToCanvas(render(refResult), 'refCanvas');
+        lastRefBuf = render(refResult);
+        blitToCanvas(lastRefBuf, 'refCanvas');
       }
 
       if (errs.length) showError(errs.join('\n\n'));
+    });
+
+    document.getElementById('scoreBtn').addEventListener('click', () => {
+      if (!lastUserBuf || !lastRefBuf) {
+        showError('Render both shaders first before scoring.');
+        return;
+      }
+      const tolerance = parseFloat(document.getElementById('tolerance').value) || 10;
+      const result = computeMAEResult(lastUserBuf, lastRefBuf, tolerance);
+
+      const panel = document.getElementById('scorePanel');
+      const val   = document.getElementById('scoreValue');
+      val.textContent = result.score.toFixed(2);
+      val.className = 'score-value ' + (result.score >= 80 ? 'high' : result.score >= 40 ? 'mid' : 'low');
+      document.getElementById('scoreBreakdown').textContent =
+        `raw MAE: ${result.rawMae.toFixed(4)}  |  tolerance: ${tolerance}  |  blur: ${result.blurApplied}`;
+      panel.classList.add('visible');
     });
 
     // Auto-render on load
