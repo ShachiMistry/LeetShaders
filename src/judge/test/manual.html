@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LeetShaders — Judge Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a1a1a; color: #eee; font-family: monospace; padding: 16px; }
+    h1 { font-size: 1.1rem; margin-bottom: 12px; color: #aaa; }
+
+    .editors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .editors label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    textarea {
+      width: 100%;
+      height: 180px;
+      background: #111;
+      color: #d4d4d4;
+      border: 1px solid #333;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      resize: vertical;
+    }
+
+    .controls { margin-bottom: 12px; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover { background: #1d4ed8; }
+
+    .renders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .render-box label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    canvas { display: block; width: 100%; border: 1px solid #333; image-rendering: pixelated; }
+
+    #errors {
+      background: #2a0000;
+      border: 1px solid #600;
+      padding: 8px;
+      font-size: 0.75rem;
+      color: #f88;
+      white-space: pre-wrap;
+      min-height: 32px;
+      display: none;
+    }
+    #errors.visible { display: block; }
+  </style>
+</head>
+<body>
+  <h1>LeetShaders — Judge Harness (Step 3: visual render)</h1>
+
+  <div class="editors">
+    <div>
+      <label>Your shader</label>
+      <textarea id="userShader"></textarea>
+    </div>
+    <div>
+      <label>Reference shader</label>
+      <textarea id="refShader"></textarea>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="renderBtn">Render</button>
+  </div>
+
+  <div class="renders">
+    <div class="render-box">
+      <label>Your output</label>
+      <canvas id="userCanvas" width="512" height="512"></canvas>
+    </div>
+    <div class="render-box">
+      <label>Reference output</label>
+      <canvas id="refCanvas" width="512" height="512"></canvas>
+    </div>
+  </div>
+
+  <pre id="errors"></pre>
+
+  <script type="module">
+    import { compileShader, render, CANVAS_SIZE } from '../pipeline.ts';
+
+    const DEFAULT_USER = `#version 300 es
+precision highp float;
+uniform vec2 u_resolution;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_resolution;
+  fragColor = vec4(uv, 0.5, 1.0);
+}`;
+
+    const DEFAULT_REF = `#version 300 es
+precision highp float;
+uniform vec2 u_resolution;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_resolution;
+  fragColor = vec4(uv, 1.0, 1.0);
+}`;
+
+    document.getElementById('userShader').value = DEFAULT_USER;
+    document.getElementById('refShader').value = DEFAULT_REF;
+
+    function blitToCanvas(pixels, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const imageData = new ImageData(new Uint8ClampedArray(pixels), CANVAS_SIZE, CANVAS_SIZE);
+      // WebGL readPixels returns bottom-up rows; flip vertically before display
+      const flipped = new Uint8ClampedArray(CANVAS_SIZE * CANVAS_SIZE * 4);
+      for (let row = 0; row < CANVAS_SIZE; row++) {
+        const src = (CANVAS_SIZE - 1 - row) * CANVAS_SIZE * 4;
+        const dst = row * CANVAS_SIZE * 4;
+        flipped.set(pixels.subarray(src, src + CANVAS_SIZE * 4), dst);
+      }
+      ctx.putImageData(new ImageData(flipped, CANVAS_SIZE, CANVAS_SIZE), 0, 0);
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errors');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function clearErrors() {
+      const el = document.getElementById('errors');
+      el.textContent = '';
+      el.classList.remove('visible');
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', () => {
+      clearErrors();
+      const userSrc = document.getElementById('userShader').value;
+      const refSrc = document.getElementById('refShader').value;
+      const errs = [];
+
+      const userResult = compileShader(userSrc);
+      if ('type' in userResult) {
+        errs.push('YOUR SHADER:\n' + userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+      } else {
+        blitToCanvas(render(userResult), 'userCanvas');
+      }
+
+      const refResult = compileShader(refSrc);
+      if ('type' in refResult) {
+        errs.push('REFERENCE SHADER:\n' + refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+      } else {
+        blitToCanvas(render(refResult), 'refCanvas');
+      }
+
+      if (errs.length) showError(errs.join('\n\n'));
+    });
+
+    // Auto-render on load
+    document.getElementById('renderBtn').click();
+  </script>
+</body>
+</html>
