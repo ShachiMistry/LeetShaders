@@ -1,0 +1,35 @@
+{
+  "name": "leet-shaders",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "seed": "tsx src/backend/seed.ts"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@monaco-editor/react": "4.7.0",
+    "@mui/material": "7.3.9",
+    "@mui/icons-material": "7.3.9",
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zustand": "5.0.5"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1"
+  }
+}
