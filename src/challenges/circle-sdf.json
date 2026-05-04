@@ -1,0 +1,10 @@
+{
+  "id": "c3d4e5f6-a1b2-4c3d-8e9f-0a1b2c3d4e5f",
+  "slug": "circle-sdf",
+  "title": "Zen Dot",
+  "description": "Render a perfectly centered, white circle on a black background. The circle should have a radius of 0.5 in screen-space and smooth, anti-aliased edges.",
+  "difficulty": "beginner",
+  "tolerance": 10.0,
+  "useBlur": true,
+  "hintText": "Use the length() function to find the distance from the center. Subtract the radius from that distance to get your Signed Distance Function (SDF). Use smoothstep() to handle the transition from white to black."
+}

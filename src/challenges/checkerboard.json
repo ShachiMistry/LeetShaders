@@ -1,0 +1,10 @@
+{
+  "id": "b2c3d4e5-f6a1-4b2c-8d9e-0f1a2b3c4d5e",
+  "slug": "checkerboard",
+  "title": "Grandmaster's Grid",
+  "description": "Render a standard 8x8 black and white checkerboard pattern. The bottom-left square should be black.",
+  "difficulty": "beginner",
+  "tolerance": 4.0,
+  "useBlur": false,
+  "hintText": "Scale your UV coordinates by 8.0, then use floor() to get integer grid cells. The parity (odd/even) of the sum of x and y will give you the checkerboard pattern."
+}
