@@ -1,0 +1,146 @@
+import type { ShaderError } from './types';
+
+export const CANVAS_SIZE = 512;
+
+// Full-screen large triangle — covers NDC clip space with 3 vertices, no buffer needed.
+// VertexID 0 → (-1,-1), 1 → (3,-1), 2 → (-1,3)
+const VERT_SRC = `#version 300 es
+out vec2 v_uv;
+void main() {
+  float x = float(gl_VertexID & 1) * 4.0 - 1.0;
+  float y = float((gl_VertexID >> 1) & 1) * 4.0 - 1.0;
+  v_uv = vec2(x, y) * 0.5 + 0.5;
+  gl_Position = vec4(x, y, 0.0, 1.0);
+}`;
+
+export interface Uniforms {
+  u_time?: number;
+  u_resolution?: [number, number];
+  u_mouse?: [number, number];
+}
+
+// Singleton GL state — one context for the entire app lifetime.
+let gl: WebGL2RenderingContext | null = null;
+let fbo: WebGLFramebuffer | null = null;
+let vertShader: WebGLShader | null = null;
+
+function initGL(): WebGL2RenderingContext {
+  const canvas = new OffscreenCanvas(CANVAS_SIZE, CANVAS_SIZE);
+  const ctx = canvas.getContext('webgl2');
+  if (!ctx) throw new Error('WebGL2 not supported in this environment');
+
+  const tex = ctx.createTexture();
+  ctx.bindTexture(ctx.TEXTURE_2D, tex);
+  ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, CANVAS_SIZE, CANVAS_SIZE, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, null);
+  ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MIN_FILTER, ctx.NEAREST);
+  ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MAG_FILTER, ctx.NEAREST);
+
+  const fb = ctx.createFramebuffer()!;
+  ctx.bindFramebuffer(ctx.FRAMEBUFFER, fb);
+  ctx.framebufferTexture2D(ctx.FRAMEBUFFER, ctx.COLOR_ATTACHMENT0, ctx.TEXTURE_2D, tex, 0);
+  ctx.bindFramebuffer(ctx.FRAMEBUFFER, null);
+
+  const vs = ctx.createShader(ctx.VERTEX_SHADER)!;
+  ctx.shaderSource(vs, VERT_SRC);
+  ctx.compileShader(vs);
+  if (!ctx.getShaderParameter(vs, ctx.COMPILE_STATUS)) {
+    throw new Error(`Internal vertex shader failed: ${ctx.getShaderInfoLog(vs)}`);
+  }
+
+  fbo = fb;
+  vertShader = vs;
+  return ctx;
+}
+
+function getGL(): WebGL2RenderingContext {
+  if (!gl) gl = initGL();
+  return gl;
+}
+
+// Parses GLSL info log lines into structured errors.
+// Handles both ANGLE format "ERROR: 0:5: msg" and bare "0:5: msg".
+function parseInfoLog(log: string): { line: number; message: string }[] {
+  const results: { line: number; message: string }[] = [];
+  for (const raw of log.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/(?:ERROR:\s*\d+:(\d+):|(\d+):(\d+):)\s*(.+)/);
+    if (m) {
+      const lineNum = parseInt(m[1] ?? m[3], 10);
+      const msg = (m[4] ?? '').trim();
+      results.push({ line: lineNum, message: msg });
+    } else {
+      results.push({ line: 0, message: line });
+    }
+  }
+  return results;
+}
+
+export function compileShader(fragSrc: string): WebGLProgram | ShaderError {
+  const ctx = getGL();
+
+  const fs = ctx.createShader(ctx.FRAGMENT_SHADER)!;
+  ctx.shaderSource(fs, fragSrc);
+  ctx.compileShader(fs);
+
+  if (!ctx.getShaderParameter(fs, ctx.COMPILE_STATUS)) {
+    const log = ctx.getShaderInfoLog(fs) ?? '';
+    ctx.deleteShader(fs);
+    return {
+      type: 'compile_error',
+      message: 'Shader compilation failed',
+      errors: parseInfoLog(log),
+    };
+  }
+
+  const prog = ctx.createProgram()!;
+  ctx.attachShader(prog, vertShader!);
+  ctx.attachShader(prog, fs);
+  ctx.linkProgram(prog);
+  ctx.deleteShader(fs);
+
+  if (!ctx.getProgramParameter(prog, ctx.LINK_STATUS)) {
+    const log = ctx.getProgramInfoLog(prog) ?? '';
+    ctx.deleteProgram(prog);
+    return {
+      type: 'compile_error',
+      message: 'Program link failed',
+      errors: parseInfoLog(log),
+    };
+  }
+
+  return prog;
+}
+
+function setUniforms(ctx: WebGL2RenderingContext, prog: WebGLProgram, uniforms: Uniforms): void {
+  const time = uniforms.u_time ?? 0;
+  const res = uniforms.u_resolution ?? [CANVAS_SIZE, CANVAS_SIZE];
+  const mouse = uniforms.u_mouse ?? [0, 0];
+
+  const locTime = ctx.getUniformLocation(prog, 'u_time');
+  if (locTime) ctx.uniform1f(locTime, time);
+
+  const locRes = ctx.getUniformLocation(prog, 'u_resolution');
+  if (locRes) ctx.uniform2f(locRes, res[0], res[1]);
+
+  const locMouse = ctx.getUniformLocation(prog, 'u_mouse');
+  if (locMouse) ctx.uniform2f(locMouse, mouse[0], mouse[1]);
+}
+
+export function render(program: WebGLProgram, uniforms: Uniforms = {}): Uint8Array {
+  const ctx = getGL();
+
+  ctx.bindFramebuffer(ctx.FRAMEBUFFER, fbo);
+  ctx.viewport(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  ctx.useProgram(program);
+
+  setUniforms(ctx, program, uniforms);
+
+  ctx.drawArrays(ctx.TRIANGLES, 0, 3);
+
+  const pixels = new Uint8Array(CANVAS_SIZE * CANVAS_SIZE * 4);
+  ctx.readPixels(0, 0, CANVAS_SIZE, CANVAS_SIZE, ctx.RGBA, ctx.UNSIGNED_BYTE, pixels);
+  ctx.bindFramebuffer(ctx.FRAMEBUFFER, null);
+
+  return pixels;
+}
