@@ -1,0 +1,24 @@
+{
+  "name": "leetshaders",
+  "version": "1.0.0",
+  "description": "A browser-native GLSL shader coding challenge platform with a hybrid AI-powered judging system.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShachiMistry/LeetShaders.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ShachiMistry/LeetShaders/issues"
+  },
+  "homepage": "https://github.com/ShachiMistry/LeetShaders#readme",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
