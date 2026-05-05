@@ -1,12 +1,19 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    open: false,
+  },
   build: {
-    rollupOptions: {
-      input: {
-        manual: resolve(__dirname, 'src/judge/test/manual.html'),
-      },
-    },
+    target: 'es2022',
+    sourcemap: true,
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 });
