@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     open: false,
+    hmr: { overlay: false },
   },
   build: {
     target: 'es2022',

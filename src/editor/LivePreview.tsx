@@ -1,5 +1,4 @@
-import { Box, Typography } from '@mui/material';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { compileShader, render, CANVAS_SIZE } from '../judge/pipeline';
 import type { ShaderError, PipelineError } from '../judge/types';
 import { shaderErrorToPipelineErrors } from '../judge/types';
@@ -11,31 +10,22 @@ interface LivePreviewProps {
   onErrors?: (errors: PipelineError[]) => void;
 }
 
-export default function LivePreview({ shaderSrc, label, timeRef, onErrors }: LivePreviewProps) {
+export default function LivePreview({ shaderSrc, timeRef, onErrors }: LivePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const programRef = useRef<WebGLProgram | null>(null);
   const rafRef = useRef<number>(0);
-  const srcRef = useRef(shaderSrc);
-
-  srcRef.current = shaderSrc;
-
-  const compileAndNotify = useCallback(
-    (src: string) => {
-      const result = compileShader(src);
-      if ('type' in result) {
-        programRef.current = null;
-        onErrors?.(shaderErrorToPipelineErrors(result as ShaderError));
-      } else {
-        programRef.current = result;
-        onErrors?.([]);
-      }
-    },
-    [onErrors],
-  );
+  const onErrorsRef = useRef(onErrors);
+  onErrorsRef.current = onErrors;
 
   useEffect(() => {
-    compileAndNotify(shaderSrc);
-  }, [shaderSrc, compileAndNotify]);
+    const result = compileShader(shaderSrc);
+    if ('type' in result) {
+      onErrorsRef.current?.(shaderErrorToPipelineErrors(result as ShaderError));
+    } else {
+      programRef.current = result;
+      onErrorsRef.current?.([]);
+    }
+  }, [shaderSrc]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,51 +34,54 @@ export default function LivePreview({ shaderSrc, label, timeRef, onErrors }: Liv
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
     const imageData = ctx.createImageData(CANVAS_SIZE, CANVAS_SIZE);
+    let active = true;
 
     function drawFrame() {
+      if (!active) return;
       const prog = programRef.current;
       if (prog && ctx) {
-        const t = timeRef ? timeRef.current : performance.now() / 1000;
-        const pixels = render(prog, {
-          u_time: t,
-          u_resolution: [CANVAS_SIZE, CANVAS_SIZE],
-        });
+        try {
+          const t = timeRef ? timeRef.current : performance.now() / 1000;
+          const pixels = render(prog, {
+            u_time: t,
+            u_resolution: [CANVAS_SIZE, CANVAS_SIZE],
+          });
 
-        // WebGL readPixels returns bottom-up rows, canvas expects top-down.
-        for (let y = 0; y < CANVAS_SIZE; y++) {
-          const srcRow = (CANVAS_SIZE - 1 - y) * CANVAS_SIZE * 4;
-          const dstRow = y * CANVAS_SIZE * 4;
-          imageData.data.set(pixels.subarray(srcRow, srcRow + CANVAS_SIZE * 4), dstRow);
+          for (let y = 0; y < CANVAS_SIZE; y++) {
+            const srcRow = (CANVAS_SIZE - 1 - y) * CANVAS_SIZE * 4;
+            const dstRow = y * CANVAS_SIZE * 4;
+            imageData.data.set(pixels.subarray(srcRow, srcRow + CANVAS_SIZE * 4), dstRow);
+          }
+          ctx.putImageData(imageData, 0, 0);
+        } catch {
+          // render failed, keep last frame
         }
-        ctx.putImageData(imageData, 0, 0);
       }
       rafRef.current = requestAnimationFrame(drawFrame);
     }
 
     rafRef.current = requestAnimationFrame(drawFrame);
-    return () => cancelAnimationFrame(rafRef.current);
+    return () => {
+      active = false;
+      cancelAnimationFrame(rafRef.current);
+    };
   }, [timeRef]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minHeight: 0 }}>
-      {label ? (
-        <Typography variant="caption" sx={{ opacity: 0.7 }}>
-          {label}
-        </Typography>
-      ) : null}
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        style={{
-          width: '100%',
-          maxWidth: CANVAS_SIZE,
-          aspectRatio: '1 / 1',
-          background: '#000',
-          borderRadius: 4,
-        }}
-      />
-    </Box>
+    <canvas
+      ref={canvasRef}
+      width={CANVAS_SIZE}
+      height={CANVAS_SIZE}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#000',
+      }}
+    />
   );
 }
