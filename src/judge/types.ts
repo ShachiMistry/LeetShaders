@@ -62,3 +62,27 @@ export interface ShaderContextLostError {
 }
 
 export type ShaderError = ShaderCompileError | ShaderTimeoutError | ShaderContextLostError;
+
+export interface PipelineError {
+  kind: 'compile-error' | 'link-error' | 'context-lost' | 'timeout';
+  line?: number;
+  column?: number;
+  message: string;
+}
+
+export function shaderErrorToPipelineErrors(err: ShaderError): PipelineError[] {
+  if (err.type === 'compile_error') {
+    if (err.errors.length === 0) {
+      return [{ kind: 'compile-error', message: err.message }];
+    }
+    return err.errors.map((e) => ({
+      kind: 'compile-error' as const,
+      line: e.line,
+      message: e.message,
+    }));
+  }
+  if (err.type === 'timeout') {
+    return [{ kind: 'timeout', message: err.message }];
+  }
+  return [{ kind: 'context-lost', message: err.message }];
+}
