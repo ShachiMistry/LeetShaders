@@ -11,7 +11,7 @@
 // tuned values replace these constants with empirical justification
 // in the comment.
 
-import type { LLMJudgeOutput } from '../judge/llm';
+import type { LLMJudgeOutput } from '../judge/types';
 
 export interface BandConfig {
   /** MAE score >= this returns pass without invoking the LLM. */

@@ -1,16 +1,25 @@
 import fs from 'fs';
 import path from 'path';
 import * as dotenv from 'dotenv';
-import { supabase } from './supabase.js';
+import { createClient } from '@supabase/supabase-js';
 
-// Load environment variables from .env or .env.local
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const CHALLENGES_DIR = './src/challenges';
 
 async function seed() {
-  console.log('🚀 Starting challenge seed process...');
+  console.log('Starting challenge seed process...');
 
   try {
     const files = fs.readdirSync(CHALLENGES_DIR);
@@ -22,14 +31,14 @@ async function seed() {
       const glslPath = path.join(CHALLENGES_DIR, `${slug}.glsl`);
 
       if (!fs.existsSync(glslPath)) {
-        console.warn(`⚠️  Warning: No matching .glsl file found for ${slug}. Skipping.`);
+        console.warn(`Warning: No matching .glsl file found for ${slug}. Skipping.`);
         continue;
       }
 
       const metadata = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
       const shaderSrc = fs.readFileSync(glslPath, 'utf-8');
 
-      console.log(`📦 Seeding challenge: ${metadata.title} (${slug})...`);
+      console.log(`Seeding challenge: ${metadata.title} (${slug})...`);
 
       const { error } = await supabase
         .from('challenges')
@@ -43,21 +52,20 @@ async function seed() {
           tolerance: metadata.tolerance,
           use_blur: metadata.useBlur,
           hint_text: metadata.hintText,
-          credit: metadata.credit
         }, {
           onConflict: 'slug'
         });
 
       if (error) {
-        console.error(`❌ Error seeding ${slug}:`, error.message);
+        console.error(`Error seeding ${slug}:`, error.message);
       } else {
-        console.log(`✅ Successfully seeded ${slug}`);
+        console.log(`Seeded ${slug}`);
       }
     }
 
-    console.log('\n✨ Seeding complete!');
+    console.log('\nSeeding complete!');
   } catch (err) {
-    console.error('💥 Fatal error during seeding:', err);
+    console.error('Fatal error during seeding:', err);
     process.exit(1);
   }
 }

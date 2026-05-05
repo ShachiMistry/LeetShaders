@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { Challenge } from '../judge/types';
 import { supabase } from './supabase';
+import { LOCAL_CHALLENGES } from './localChallenges';
+
+const SUPABASE_CONFIGURED =
+  import.meta.env.VITE_SUPABASE_URL &&
+  !import.meta.env.VITE_SUPABASE_URL.includes('placeholder');
 
 interface UseChallengesResult {
   data: Challenge[] | null;
@@ -11,13 +16,12 @@ interface UseChallengesResult {
 export function useChallenges(): UseChallengesResult {
   const [data, setData] = useState<Challenge[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error] = useState<Error | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetch() {
-      setLoading(true);
+    async function fetchFromSupabase() {
       const { data: rows, error: err } = await supabase
         .from('challenges')
         .select('*')
@@ -25,13 +29,13 @@ export function useChallenges(): UseChallengesResult {
 
       if (cancelled) return;
 
-      if (err) {
-        setError(new Error(err.message));
+      if (err || !rows || rows.length === 0) {
+        setData(LOCAL_CHALLENGES);
         setLoading(false);
         return;
       }
 
-      const challenges: Challenge[] = (rows ?? []).map((r: Record<string, unknown>) => ({
+      const challenges: Challenge[] = rows.map((r: Record<string, unknown>) => ({
         id: r.id as string,
         slug: r.slug as string,
         title: r.title as string,
@@ -47,7 +51,13 @@ export function useChallenges(): UseChallengesResult {
       setLoading(false);
     }
 
-    fetch();
+    if (SUPABASE_CONFIGURED) {
+      fetchFromSupabase();
+    } else {
+      setData(LOCAL_CHALLENGES);
+      setLoading(false);
+    }
+
     return () => { cancelled = true; };
   }, []);
 
@@ -66,8 +76,7 @@ export function useChallenge(slug: string): UseChallengeResult {
   useEffect(() => {
     let cancelled = false;
 
-    async function fetch() {
-      setLoading(true);
+    async function fetchFromSupabase() {
       const { data: row, error: err } = await supabase
         .from('challenges')
         .select('*')
@@ -77,6 +86,8 @@ export function useChallenge(slug: string): UseChallengeResult {
       if (cancelled) return;
 
       if (err || !row) {
+        const local = LOCAL_CHALLENGES.find((c) => c.slug === slug) ?? null;
+        setData(local);
         setLoading(false);
         return;
       }
@@ -95,7 +106,14 @@ export function useChallenge(slug: string): UseChallengeResult {
       setLoading(false);
     }
 
-    fetch();
+    if (SUPABASE_CONFIGURED) {
+      fetchFromSupabase();
+    } else {
+      const local = LOCAL_CHALLENGES.find((c) => c.slug === slug) ?? null;
+      setData(local);
+      setLoading(false);
+    }
+
     return () => { cancelled = true; };
   }, [slug]);
 
@@ -103,6 +121,7 @@ export function useChallenge(slug: string): UseChallengeResult {
 }
 
 export async function submitSolve(challengeId: string, score: number, shaderSrc: string): Promise<void> {
+  if (!SUPABASE_CONFIGURED) return;
   const { error } = await supabase.from('solves').insert({
     challenge_id: challengeId,
     score,
