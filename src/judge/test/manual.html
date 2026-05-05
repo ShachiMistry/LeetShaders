@@ -65,6 +65,19 @@
     #scorePanel .score-value.low  { color: #f87171; }
     #scorePanel .breakdown { margin-top: 6px; color: #888; font-size: 0.75rem; }
 
+    #judgePanel {
+      background: #111;
+      border: 1px solid #333;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 0.8rem;
+      display: none;
+    }
+    #judgePanel.visible { display: block; }
+    #judgeVerdict { font-weight: bold; }
+    #judgeVerdict.pass { color: #4ade80; }
+    #judgeVerdict.fail { color: #f87171; }
+
     #errors {
       background: #2a0000;
       border: 1px solid #600;
@@ -94,6 +107,7 @@
   <div class="controls">
     <button id="renderBtn">Render</button>
     <button id="scoreBtn">Score (MAE)</button>
+    <button id="judgeBtn">Judge (full)</button>
     <span class="tolerance-row">
       tolerance: <input id="tolerance" type="number" value="10" min="0.1" step="0.5" />
     </span>
@@ -105,6 +119,15 @@
   <div id="scorePanel">
     <div>MAE score: <span id="scoreValue" class="score-value">—</span></div>
     <div class="breakdown" id="scoreBreakdown"></div>
+  </div>
+
+  <div id="judgePanel">
+    <div>
+      Final score: <span id="judgeFinal" class="score-value">—</span>
+      &nbsp;&nbsp;
+      <span id="judgeVerdict"></span>
+    </div>
+    <div class="breakdown" id="judgeBreakdown"></div>
   </div>
 
   <div class="renders">
@@ -123,6 +146,8 @@
   <script type="module">
     import { compileShader, render, CANVAS_SIZE } from '../pipeline.ts';
     import { computeMAEResult } from '../mae.ts';
+    import { judge } from '../combiner.ts';
+    import { llmJudge } from '../llm.ts';
 
     const DEFAULT_USER = `#version 300 es
 precision highp float;
@@ -223,6 +248,54 @@ void main() {
       document.getElementById('scoreBreakdown').textContent =
         `raw MAE: ${result.rawMae.toFixed(4)}  |  tolerance: ${tolerance}  |  blur: ${result.blurApplied}`;
       panel.classList.add('visible');
+    });
+
+    document.getElementById('judgeBtn').addEventListener('click', async () => {
+      clearErrors();
+      document.getElementById('judgePanel').classList.remove('visible');
+
+      const userSrc = document.getElementById('userShader').value;
+      const refSrc  = document.getElementById('refShader').value;
+      const tolerance = parseFloat(document.getElementById('tolerance').value) || 10;
+      const useBlur   = document.getElementById('useBlur').checked;
+
+      const challenge = {
+        id: 'manual-test',
+        slug: 'manual-test',
+        title: 'Manual Test',
+        description: '',
+        difficulty: 'beginner',
+        referenceShaderSrc: refSrc,
+        tolerance,
+        useBlur,
+      };
+
+      try {
+        const result = await judge(userSrc, challenge, llmJudge);
+
+        const final   = document.getElementById('judgeFinal');
+        final.textContent = result.finalScore.toFixed(2);
+        final.className = 'score-value ' + (result.finalScore >= 80 ? 'high' : result.finalScore >= 40 ? 'mid' : 'low');
+
+        const verdict = document.getElementById('judgeVerdict');
+        verdict.textContent = result.passed ? 'PASS' : 'FAIL';
+        verdict.className = result.passed ? 'pass' : 'fail';
+
+        const lines = [
+          `MAE: ${result.maeScore.toFixed(2)}  raw: ${result.breakdown.maeRaw.toFixed(4)}`,
+          `LLM: ${result.llmScore !== null ? result.llmScore.toFixed(2) : 'skipped'}  stage2: ${result.breakdown.stageTwoInvoked}`,
+          `render: ${result.renderLatencyMs.toFixed(1)}ms  judge: ${result.judgeLatencyMs.toFixed(1)}ms`,
+        ];
+        if (result.breakdown.llmReasoning) lines.push(`reasoning: ${result.breakdown.llmReasoning}`);
+        document.getElementById('judgeBreakdown').textContent = lines.join('\n');
+
+        document.getElementById('judgePanel').classList.add('visible');
+
+        // Re-blit renders in case judgeBtn was clicked without rendering first
+        if (!lastUserBuf || !lastRefBuf) document.getElementById('renderBtn').click();
+      } catch (e) {
+        showError(String(e));
+      }
     });
 
     // Auto-render on load
