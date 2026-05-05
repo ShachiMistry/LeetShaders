@@ -209,27 +209,31 @@ void main() {
       lastUserBuf = null;
       lastRefBuf  = null;
 
-      const userSrc = document.getElementById('userShader').value;
-      const refSrc  = document.getElementById('refShader').value;
-      const errs = [];
+      try {
+        const userSrc = document.getElementById('userShader').value;
+        const refSrc  = document.getElementById('refShader').value;
+        const errs = [];
 
-      const userResult = compileShader(userSrc);
-      if ('type' in userResult) {
-        errs.push('YOUR SHADER:\n' + userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
-      } else {
-        lastUserBuf = render(userResult);
-        blitToCanvas(lastUserBuf, 'userCanvas');
+        const userResult = compileShader(userSrc);
+        if ('type' in userResult) {
+          errs.push('YOUR SHADER:\n' + userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+        } else {
+          lastUserBuf = render(userResult);
+          blitToCanvas(lastUserBuf, 'userCanvas');
+        }
+
+        const refResult = compileShader(refSrc);
+        if ('type' in refResult) {
+          errs.push('REFERENCE SHADER:\n' + refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+        } else {
+          lastRefBuf = render(refResult);
+          blitToCanvas(lastRefBuf, 'refCanvas');
+        }
+
+        if (errs.length) showError(errs.join('\n\n'));
+      } catch (e) {
+        showError('Render failed: ' + String(e));
       }
-
-      const refResult = compileShader(refSrc);
-      if ('type' in refResult) {
-        errs.push('REFERENCE SHADER:\n' + refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
-      } else {
-        lastRefBuf = render(refResult);
-        blitToCanvas(lastRefBuf, 'refCanvas');
-      }
-
-      if (errs.length) showError(errs.join('\n\n'));
     });
 
     document.getElementById('scoreBtn').addEventListener('click', () => {

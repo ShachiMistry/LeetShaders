@@ -1,4 +1,4 @@
-import { compileShader, render } from './pipeline';
+import { compileAndRender } from './pipeline';
 import { computeMAEResult } from './mae';
 import type { Challenge, JudgeResult, LLMJudgeFn } from './types';
 
@@ -28,22 +28,21 @@ export async function judge(
 ): Promise<JudgeResult> {
   const judgeStart = performance.now();
 
-  // Stage 0: compile and render both shaders
+  // Stage 0: compile and render both shaders, with watchdog
   const renderStart = performance.now();
 
-  const userProgram = compileShader(userShaderSrc);
-  if ('type' in userProgram) {
-    return failResult(0, userProgram.message, performance.now() - renderStart, 0);
+  const userResult = compileAndRender(userShaderSrc);
+  if ('type' in userResult) {
+    return failResult(0, userResult.message, performance.now() - renderStart, 0);
   }
 
-  const refProgram = compileShader(challenge.referenceShaderSrc);
-  if ('type' in refProgram) {
-    // Reference shader failing is a system error, not a user error — surface it clearly.
-    return failResult(0, `Reference shader error: ${refProgram.message}`, performance.now() - renderStart, 0);
+  const refResult = compileAndRender(challenge.referenceShaderSrc);
+  if ('type' in refResult) {
+    return failResult(0, `Reference shader error: ${refResult.message}`, performance.now() - renderStart, 0);
   }
 
-  const userRender = render(userProgram);
-  const refRender  = render(refProgram);
+  const userRender = userResult.pixels;
+  const refRender  = refResult.pixels;
   const renderLatencyMs = performance.now() - renderStart;
 
   // Stage 1: MAE
