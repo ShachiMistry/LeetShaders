@@ -56,4 +56,9 @@ export interface ShaderTimeoutError {
   message: string;
 }
 
-export type ShaderError = ShaderCompileError | ShaderTimeoutError;
+export interface ShaderContextLostError {
+  type: 'context_lost';
+  message: string;
+}
+
+export type ShaderError = ShaderCompileError | ShaderTimeoutError | ShaderContextLostError;

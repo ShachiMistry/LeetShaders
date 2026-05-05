@@ -108,6 +108,7 @@
     <button id="renderBtn">Render</button>
     <button id="scoreBtn">Score (MAE)</button>
     <button id="judgeBtn">Judge (full)</button>
+    <button id="killCtxBtn" style="background:#7f1d1d">Kill Context</button>
     <span class="tolerance-row">
       tolerance: <input id="tolerance" type="number" value="10" min="0.1" step="0.5" />
     </span>
@@ -144,7 +145,7 @@
   <pre id="errors"></pre>
 
   <script type="module">
-    import { compileShader, render, CANVAS_SIZE } from '../pipeline.ts';
+    import { compileShader, render, CANVAS_SIZE, getCanvas, getContext } from '../pipeline.ts';
     import { computeMAEResult } from '../mae.ts';
     import { judge } from '../combiner.ts';
     import { llmJudge } from '../llm.ts';
@@ -216,7 +217,10 @@ void main() {
 
         const userResult = compileShader(userSrc);
         if ('type' in userResult) {
-          errs.push('YOUR SHADER:\n' + userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+          const detail = userResult.type === 'compile_error'
+            ? userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n')
+            : userResult.message;
+          errs.push(`YOUR SHADER (${userResult.type}):\n${detail}`);
         } else {
           lastUserBuf = render(userResult);
           blitToCanvas(lastUserBuf, 'userCanvas');
@@ -224,7 +228,10 @@ void main() {
 
         const refResult = compileShader(refSrc);
         if ('type' in refResult) {
-          errs.push('REFERENCE SHADER:\n' + refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n'));
+          const detail = refResult.type === 'compile_error'
+            ? refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n')
+            : refResult.message;
+          errs.push(`REFERENCE SHADER (${refResult.type}):\n${detail}`);
         } else {
           lastRefBuf = render(refResult);
           blitToCanvas(lastRefBuf, 'refCanvas');
@@ -300,6 +307,22 @@ void main() {
       } catch (e) {
         showError(String(e));
       }
+    });
+
+    document.getElementById('killCtxBtn').addEventListener('click', () => {
+      const ext = getContext().getExtension('WEBGL_lose_context');
+      if (!ext) { showError('WEBGL_lose_context not supported'); return; }
+
+      getCanvas().addEventListener('webglcontextrestored', () => {
+        clearErrors();
+        document.getElementById('renderBtn').click();
+      }, { once: true });
+
+      ext.loseContext();
+      showError('Context killed — waiting for webglcontextrestored...');
+      // loseContext() is simulated — must call restoreContext() explicitly.
+      // Real GPU crashes restore automatically via preventDefault(); simulated ones don't.
+      setTimeout(() => ext.restoreContext(), 200);
     });
 
     // Auto-render on load

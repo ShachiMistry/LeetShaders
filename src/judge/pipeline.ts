@@ -19,21 +19,16 @@ export interface Uniforms {
   u_mouse?: [number, number];
 }
 
-// Singleton GL state — one context for the entire app lifetime.
+// Singleton state. canvas persists across context-loss cycles; gl/fbo/vertShader
+// are nulled on loss and rebuilt on restore.
+let canvas: HTMLCanvasElement | null = null;
 let gl: WebGL2RenderingContext | null = null;
 let fbo: WebGLFramebuffer | null = null;
 let vertShader: WebGLShader | null = null;
 
-function initGL(): WebGL2RenderingContext {
-  const canvas = document.createElement('canvas');
-  canvas.width  = CANVAS_SIZE;
-  canvas.height = CANVAS_SIZE;
-  const ctx = canvas.getContext('webgl2');
-  if (!ctx) throw new Error('WebGL2 not supported in this environment');
-
-  // FBO with RGBA8 (sized internal format required by WebGL2 for color-renderable
-  // attachments). Chrome/ANGLE does not reliably support readPixels from the
-  // default framebuffer on macOS — FBO is the correct solution.
+function setupGLResources(ctx: WebGL2RenderingContext): void {
+  // FBO with RGBA8 — sized internal format required by WebGL2 for guaranteed
+  // color-renderable attachments. Chrome/ANGLE needs this for readPixels.
   const tex = ctx.createTexture()!;
   ctx.bindTexture(ctx.TEXTURE_2D, tex);
   ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA8, CANVAS_SIZE, CANVAS_SIZE, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, null);
@@ -60,16 +55,47 @@ function initGL(): WebGL2RenderingContext {
 
   fbo = fb;
   vertShader = vs;
-  return ctx;
+  gl = ctx;
+}
+
+function initCanvas(): void {
+  canvas = document.createElement('canvas');
+  canvas.width  = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+
+  canvas.addEventListener('webglcontextlost', (e: Event) => {
+    e.preventDefault(); // required to allow context restoration
+    gl = null;
+    fbo = null;
+    vertShader = null;
+  });
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    // getContext on the same canvas after restoration returns the recovered context.
+    const ctx = canvas!.getContext('webgl2');
+    if (ctx) setupGLResources(ctx);
+  });
+
+  const ctx = canvas.getContext('webgl2');
+  if (!ctx) throw new Error('WebGL2 not supported in this environment');
+  setupGLResources(ctx);
 }
 
 function getGL(): WebGL2RenderingContext {
-  if (!gl) gl = initGL();
+  if (!canvas) initCanvas();
+  if (!gl) throw new Error('WebGL context is lost — waiting for webglcontextrestored');
   return gl;
 }
 
 export function getContext(): WebGL2RenderingContext {
   return getGL();
+}
+
+// Returns the canvas so callers (e.g. test harness) can force context loss
+// via WEBGL_lose_context for testing recovery.
+export function getCanvas(): HTMLCanvasElement {
+  if (!canvas) initCanvas();
+  return canvas!;
 }
 
 // Parses GLSL info log lines into structured errors.
@@ -92,7 +118,12 @@ function parseInfoLog(log: string): { line: number; message: string }[] {
 }
 
 export function compileShader(fragSrc: string): WebGLProgram | ShaderError {
-  const ctx = getGL();
+  let ctx: WebGL2RenderingContext;
+  try {
+    ctx = getGL();
+  } catch {
+    return { type: 'context_lost', message: 'WebGL context is lost — try again in a moment' };
+  }
 
   const fs = ctx.createShader(ctx.FRAGMENT_SHADER)!;
   ctx.shaderSource(fs, fragSrc);
@@ -128,7 +159,7 @@ export function compileShader(fragSrc: string): WebGLProgram | ShaderError {
 }
 
 function setUniforms(ctx: WebGL2RenderingContext, prog: WebGLProgram, uniforms: Uniforms): void {
-  const time = uniforms.u_time ?? 0;
+  const time  = uniforms.u_time ?? 0;
   const res   = uniforms.u_resolution ?? [CANVAS_SIZE, CANVAS_SIZE];
   const mouse = uniforms.u_mouse ?? [0, 0];
 
@@ -190,6 +221,11 @@ export function compileAndRender(
   const total = performance.now() - start;
   if (total > timeoutMs) {
     return { type: 'timeout', message: `Render took ${renderMs.toFixed(0)}ms, total ${total.toFixed(0)}ms exceeded ${timeoutMs}ms limit` };
+  }
+
+  // Detect context loss that happened silently during render (returns all zeros).
+  if (gl?.isContextLost()) {
+    return { type: 'context_lost', message: 'WebGL context was lost during render' };
   }
 
   return { pixels, compileMs, renderMs };
