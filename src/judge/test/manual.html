@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LeetShaders — Judge Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a1a1a; color: #eee; font-family: monospace; padding: 16px; }
+    h1 { font-size: 1.1rem; margin-bottom: 12px; color: #aaa; }
+
+    .editors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .editors label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    textarea {
+      width: 100%;
+      height: 180px;
+      background: #111;
+      color: #d4d4d4;
+      border: 1px solid #333;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      resize: vertical;
+    }
+
+    .controls { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover { background: #1d4ed8; }
+    .tolerance-row { font-size: 0.75rem; color: #888; display: flex; align-items: center; gap: 8px; }
+    .tolerance-row input { width: 60px; background: #111; color: #eee; border: 1px solid #333; padding: 4px; }
+
+    .renders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .render-box label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    canvas { display: block; width: 100%; border: 1px solid #333; image-rendering: pixelated; }
+
+    #scorePanel {
+      background: #111;
+      border: 1px solid #333;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 0.8rem;
+      display: none;
+    }
+    #scorePanel.visible { display: block; }
+    #scorePanel .score-value { font-size: 1.4rem; font-weight: bold; }
+    #scorePanel .score-value.high { color: #4ade80; }
+    #scorePanel .score-value.mid  { color: #facc15; }
+    #scorePanel .score-value.low  { color: #f87171; }
+    #scorePanel .breakdown { margin-top: 6px; color: #888; font-size: 0.75rem; }
+
+    #judgePanel {
+      background: #111;
+      border: 1px solid #333;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 0.8rem;
+      display: none;
+    }
+    #judgePanel.visible { display: block; }
+    #judgeVerdict { font-weight: bold; }
+    #judgeVerdict.pass { color: #4ade80; }
+    #judgeVerdict.fail { color: #f87171; }
+
+    #errors {
+      background: #2a0000;
+      border: 1px solid #600;
+      padding: 8px;
+      font-size: 0.75rem;
+      color: #f88;
+      white-space: pre-wrap;
+      display: none;
+    }
+    #errors.visible { display: block; }
+  </style>
+</head>
+<body>
+  <h1>LeetShaders — Judge Harness</h1>
+
+  <div class="editors">
+    <div>
+      <label>Your shader</label>
+      <textarea id="userShader"></textarea>
+    </div>
+    <div>
+      <label>Reference shader</label>
+      <textarea id="refShader"></textarea>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="renderBtn">Render</button>
+    <button id="scoreBtn">Score (MAE)</button>
+    <button id="judgeBtn">Judge (full)</button>
+    <button id="killCtxBtn" style="background:#7f1d1d">Kill Context</button>
+    <span class="tolerance-row">
+      tolerance: <input id="tolerance" type="number" value="10" min="0.1" step="0.5" />
+    </span>
+    <label class="tolerance-row" style="cursor:pointer">
+      <input type="checkbox" id="useBlur" /> blur pre-pass
+    </label>
+  </div>
+
+  <div id="scorePanel">
+    <div>MAE score: <span id="scoreValue" class="score-value">—</span></div>
+    <div class="breakdown" id="scoreBreakdown"></div>
+  </div>
+
+  <div id="judgePanel">
+    <div>
+      Final score: <span id="judgeFinal" class="score-value">—</span>
+      &nbsp;&nbsp;
+      <span id="judgeVerdict"></span>
+    </div>
+    <div class="breakdown" id="judgeBreakdown"></div>
+  </div>
+
+  <div class="renders">
+    <div class="render-box">
+      <label>Your output</label>
+      <canvas id="userCanvas" width="512" height="512"></canvas>
+    </div>
+    <div class="render-box">
+      <label>Reference output</label>
+      <canvas id="refCanvas" width="512" height="512"></canvas>
+    </div>
+  </div>
+
+  <pre id="errors"></pre>
+
+  <script type="module">
+    import { compileShader, render, CANVAS_SIZE, getCanvas, getContext } from '../pipeline.ts';
+    import { computeMAEResult } from '../mae.ts';
+    import { judge } from '../combiner.ts';
+    import { llmJudge } from '../llm.ts';
+
+    const DEFAULT_USER = `#version 300 es
+precision highp float;
+uniform vec2 u_resolution;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_resolution;
+  fragColor = vec4(uv, 0.5, 1.0);
+}`;
+
+    const DEFAULT_REF = `#version 300 es
+precision highp float;
+uniform vec2 u_resolution;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_resolution;
+  fragColor = vec4(uv, 1.0, 1.0);
+}`;
+
+    document.getElementById('userShader').value = DEFAULT_USER;
+    document.getElementById('refShader').value = DEFAULT_REF;
+
+    // Buffers from the last render, used by the score button
+    let lastUserBuf = null;
+    let lastRefBuf  = null;
+
+    function flipY(pixels) {
+      // WebGL readPixels returns rows bottom-up; flip for correct display
+      const flipped = new Uint8ClampedArray(CANVAS_SIZE * CANVAS_SIZE * 4);
+      for (let row = 0; row < CANVAS_SIZE; row++) {
+        const src = (CANVAS_SIZE - 1 - row) * CANVAS_SIZE * 4;
+        const dst = row * CANVAS_SIZE * 4;
+        flipped.set(pixels.subarray(src, src + CANVAS_SIZE * 4), dst);
+      }
+      return flipped;
+    }
+
+    function blitToCanvas(pixels, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      ctx.putImageData(new ImageData(flipY(pixels), CANVAS_SIZE, CANVAS_SIZE), 0, 0);
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errors');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function clearErrors() {
+      const el = document.getElementById('errors');
+      el.textContent = '';
+      el.classList.remove('visible');
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', () => {
+      clearErrors();
+      document.getElementById('scorePanel').classList.remove('visible');
+      lastUserBuf = null;
+      lastRefBuf  = null;
+
+      try {
+        const userSrc = document.getElementById('userShader').value;
+        const refSrc  = document.getElementById('refShader').value;
+        const errs = [];
+
+        const userResult = compileShader(userSrc);
+        if ('type' in userResult) {
+          const detail = userResult.type === 'compile_error'
+            ? userResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n')
+            : userResult.message;
+          errs.push(`YOUR SHADER (${userResult.type}):\n${detail}`);
+        } else {
+          lastUserBuf = render(userResult);
+          blitToCanvas(lastUserBuf, 'userCanvas');
+        }
+
+        const refResult = compileShader(refSrc);
+        if ('type' in refResult) {
+          const detail = refResult.type === 'compile_error'
+            ? refResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n')
+            : refResult.message;
+          errs.push(`REFERENCE SHADER (${refResult.type}):\n${detail}`);
+        } else {
+          lastRefBuf = render(refResult);
+          blitToCanvas(lastRefBuf, 'refCanvas');
+        }
+
+        if (errs.length) showError(errs.join('\n\n'));
+      } catch (e) {
+        showError('Render failed: ' + String(e));
+      }
+    });
+
+    document.getElementById('scoreBtn').addEventListener('click', () => {
+      if (!lastUserBuf || !lastRefBuf) {
+        showError('Render both shaders first before scoring.');
+        return;
+      }
+      const tolerance = parseFloat(document.getElementById('tolerance').value) || 10;
+      const useBlur = document.getElementById('useBlur').checked;
+      const result = computeMAEResult(lastUserBuf, lastRefBuf, tolerance, useBlur);
+
+      const panel = document.getElementById('scorePanel');
+      const val   = document.getElementById('scoreValue');
+      val.textContent = result.score.toFixed(2);
+      val.className = 'score-value ' + (result.score >= 80 ? 'high' : result.score >= 40 ? 'mid' : 'low');
+      document.getElementById('scoreBreakdown').textContent =
+        `raw MAE: ${result.rawMae.toFixed(4)}  |  tolerance: ${tolerance}  |  blur: ${result.blurApplied}`;
+      panel.classList.add('visible');
+    });
+
+    document.getElementById('judgeBtn').addEventListener('click', async () => {
+      clearErrors();
+      document.getElementById('judgePanel').classList.remove('visible');
+
+      const userSrc = document.getElementById('userShader').value;
+      const refSrc  = document.getElementById('refShader').value;
+      const tolerance = parseFloat(document.getElementById('tolerance').value) || 10;
+      const useBlur   = document.getElementById('useBlur').checked;
+
+      const challenge = {
+        id: 'manual-test',
+        slug: 'manual-test',
+        title: 'Manual Test',
+        description: '',
+        difficulty: 'beginner',
+        referenceShaderSrc: refSrc,
+        tolerance,
+        useBlur,
+      };
+
+      try {
+        const result = await judge(userSrc, challenge, llmJudge);
+
+        const final   = document.getElementById('judgeFinal');
+        final.textContent = result.finalScore.toFixed(2);
+        final.className = 'score-value ' + (result.finalScore >= 80 ? 'high' : result.finalScore >= 40 ? 'mid' : 'low');
+
+        const verdict = document.getElementById('judgeVerdict');
+        verdict.textContent = result.passed ? 'PASS' : 'FAIL';
+        verdict.className = result.passed ? 'pass' : 'fail';
+
+        const lines = [
+          `MAE: ${result.maeScore.toFixed(2)}  raw: ${result.breakdown.maeRaw.toFixed(4)}`,
+          `LLM: ${result.llmScore !== null ? result.llmScore.toFixed(2) : 'skipped'}  stage2: ${result.breakdown.stageTwoInvoked}`,
+          `render: ${result.renderLatencyMs.toFixed(1)}ms  judge: ${result.judgeLatencyMs.toFixed(1)}ms`,
+        ];
+        if (result.breakdown.llmReasoning) lines.push(`reasoning: ${result.breakdown.llmReasoning}`);
+        document.getElementById('judgeBreakdown').textContent = lines.join('\n');
+
+        document.getElementById('judgePanel').classList.add('visible');
+
+        // Re-blit renders in case judgeBtn was clicked without rendering first
+        if (!lastUserBuf || !lastRefBuf) document.getElementById('renderBtn').click();
+      } catch (e) {
+        showError(String(e));
+      }
+    });
+
+    document.getElementById('killCtxBtn').addEventListener('click', () => {
+      const ext = getContext().getExtension('WEBGL_lose_context');
+      if (!ext) { showError('WEBGL_lose_context not supported'); return; }
+
+      getCanvas().addEventListener('webglcontextrestored', () => {
+        clearErrors();
+        document.getElementById('renderBtn').click();
+      }, { once: true });
+
+      ext.loseContext();
+      showError('Context killed — waiting for webglcontextrestored...');
+      // loseContext() is simulated — must call restoreContext() explicitly.
+      // Real GPU crashes restore automatically via preventDefault(); simulated ones don't.
+      setTimeout(() => ext.restoreContext(), 200);
+    });
+
+    // Auto-render on load
+    document.getElementById('renderBtn').click();
+  </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head><title>Step 2 — Pixel Buffer Check</title></head>
+<body>
+<pre id="out">Running...</pre>
+<canvas id="c" width="512" height="512" style="border:1px solid #ccc"></canvas>
+
+<script type="module">
+// Inline pipeline (no bundler needed for this quick check)
+const SIZE = 512;
+
+const VERT = `#version 300 es
+out vec2 v_uv;
+void main() {
+  float x = float(gl_VertexID & 1) * 4.0 - 1.0;
+  float y = float((gl_VertexID >> 1) & 1) * 4.0 - 1.0;
+  v_uv = vec2(x, y) * 0.5 + 0.5;
+  gl_Position = vec4(x, y, 0.0, 1.0);
+}`;
+
+// Solid red shader
+const FRAG_RED = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+void main() { fragColor = vec4(1.0, 0.0, 0.0, 1.0); }`;
+
+// Solid blue shader
+const FRAG_BLUE = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+void main() { fragColor = vec4(0.0, 0.0, 1.0, 1.0); }`;
+
+// Broken shader
+const FRAG_BROKEN = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+void main() { bad syntax here }`;
+
+const log = (msg) => {
+  document.getElementById('out').textContent += '\n' + msg;
+  console.log(msg);
+};
+
+function makeGL() {
+  const offscreen = new OffscreenCanvas(SIZE, SIZE);
+  const gl = offscreen.getContext('webgl2');
+  if (!gl) throw new Error('WebGL2 not supported');
+
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, SIZE, SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, VERT);
+  gl.compileShader(vs);
+
+  return { gl, fbo, vs };
+}
+
+function compile(gl, vs, fragSrc) {
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, fragSrc);
+  gl.compileShader(fs);
+  if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+    const err = gl.getShaderInfoLog(fs);
+    gl.deleteShader(fs);
+    return { error: err };
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.deleteShader(fs);
+  return { prog };
+}
+
+function renderAndRead(gl, fbo, prog) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.viewport(0, 0, SIZE, SIZE);
+  gl.useProgram(prog);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  const pixels = new Uint8Array(SIZE * SIZE * 4);
+  gl.readPixels(0, 0, SIZE, SIZE, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return pixels;
+}
+
+// Draw a buffer to the visible canvas for visual confirmation
+function blit(pixels, label) {
+  const c = document.getElementById('c');
+  const ctx = c.getContext('2d');
+  const id = new ImageData(new Uint8ClampedArray(pixels), SIZE, SIZE);
+  ctx.putImageData(id, 0, 0);
+  ctx.fillStyle = 'white';
+  ctx.font = '20px monospace';
+  ctx.fillText(label, 10, 30);
+}
+
+document.getElementById('out').textContent = '';
+log('=== Step 2 Pixel Buffer Check ===\n');
+
+const { gl, fbo, vs } = makeGL();
+
+// Test 1: solid red
+const { prog: redProg } = compile(gl, vs, FRAG_RED);
+const redBuf = renderAndRead(gl, fbo, redProg);
+const redPixel = Array.from(redBuf.slice(0, 4));
+const redPass = redPixel[0] === 255 && redPixel[1] === 0 && redPixel[2] === 0 && redPixel[3] === 255;
+log(`[${redPass ? 'PASS' : 'FAIL'}] Solid red  → pixel[0..3] = ${JSON.stringify(redPixel)}  (expected [255,0,0,255])`);
+blit(redBuf, 'RED');
+
+// Test 2: solid blue
+const { prog: blueProg } = compile(gl, vs, FRAG_BLUE);
+const blueBuf = renderAndRead(gl, fbo, blueProg);
+const bluePixel = Array.from(blueBuf.slice(0, 4));
+const bluePass = bluePixel[0] === 0 && bluePixel[1] === 0 && bluePixel[2] === 255 && bluePixel[3] === 255;
+log(`[${bluePass ? 'PASS' : 'FAIL'}] Solid blue → pixel[0..3] = ${JSON.stringify(bluePixel)}  (expected [0,0,255,255])`);
+
+// Test 3: broken shader returns error, no crash
+const { error } = compile(gl, vs, FRAG_BROKEN);
+const errPass = typeof error === 'string' && error.length > 0;
+log(`[${errPass ? 'PASS' : 'FAIL'}] Broken shader → error string returned (not a crash)`);
+log(`               info log: "${error?.split('\n')[0]}"`);
+
+log('\nAll zeros in pixel = pipeline broken (readPixels returned empty)');
+log('Non-zero RGBA values = GPU rendered correctly ✓');
+</script>
+</body>
+</html>
