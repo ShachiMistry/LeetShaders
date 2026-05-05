@@ -12,14 +12,15 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { callJudge, type JudgeResponse } from './judgeCall';
+import { DEFAULT_BANDS } from '../bandLogic';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = join(HERE, 'fixtures');
 const REPORT_PATH = join(HERE, 'REPORT.md');
 
-// Pass threshold used by the combiner's band logic. Keep this in sync
-// with DEFAULT_BANDS.passThreshold in src/ai/bandLogic.ts.
-const PASS_THRESHOLD = 80;
+// Pass threshold shared with the combiner (src/judge/combiner.ts) so the
+// eval harness measures fixtures against the same bar production uses.
+const PASS_THRESHOLD = DEFAULT_BANDS.passThreshold;
 
 // 1x1 magenta PNG. Placeholder for missing `.png` siblings. See
 // fixtures/README.md for the capture workflow that replaces this.

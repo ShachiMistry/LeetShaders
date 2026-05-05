@@ -77,10 +77,10 @@ export interface ApplyBandLogicInput {
 export interface ApplyBandLogicResult {
   llmInvoked: boolean;
   llmResult: LLMJudgeOutput | null;
+  llmUnavailable: boolean;
   finalScore: number;
   passed: boolean;
-  /** Short human-readable trace for the breakdown field on JudgeResult. */
-  trace: string;
+  trace?: string;
 }
 
 /**
@@ -99,6 +99,7 @@ export async function applyBandLogic(
     return {
       llmInvoked: false,
       llmResult: null,
+      llmUnavailable: false,
       finalScore: input.maeScore,
       passed: true,
       trace: `MAE ${input.maeScore.toFixed(1)} >= upperBand ${config.upperBand}, skipped LLM.`,
@@ -109,21 +110,44 @@ export async function applyBandLogic(
     return {
       llmInvoked: false,
       llmResult: null,
+      llmUnavailable: false,
       finalScore: input.maeScore,
       passed: false,
       trace: `MAE ${input.maeScore.toFixed(1)} < lowerBand ${config.lowerBand}, skipped LLM.`,
     };
   }
 
-  const llmResult = await input.callLLM();
+  // Borderline — invoke LLM and combine scores. If the LLM call fails
+  // (network, rate limit, API key issue), fall back to MAE-only scoring
+  // so the submit flow never hangs. The breakdown will flag this for the UI.
+  let llmResult: LLMJudgeOutput | null = null;
+  let llmUnavailable = false;
 
+  try {
+    llmResult = await input.callLLM();
+  } catch (err) {
+    llmUnavailable = true;
+    // Fallback: treat as if LLM was never invoked, score on MAE alone.
+    const passed = input.maeScore >= config.passThreshold;
+    return {
+      llmInvoked: false,
+      llmResult: null,
+      llmUnavailable,
+      finalScore: input.maeScore,
+      passed,
+      trace: `LLM unavailable (${err instanceof Error ? err.message : String(err)}), scored on MAE only`,
+    };
+  }
+
+  // Flagged shaders (cheating detected) always fail.
   if (llmResult.flagged) {
     return {
       llmInvoked: true,
       llmResult,
+      llmUnavailable,
       finalScore: 0,
       passed: false,
-      trace: `Flagged by LLM (${llmResult.reasoning}); forced fail.`,
+      trace: `Flagged by LLM: ${llmResult.reasoning}`,
     };
   }
 
@@ -132,6 +156,7 @@ export async function applyBandLogic(
   return {
     llmInvoked: true,
     llmResult,
+    llmUnavailable,
     finalScore,
     passed,
     trace: `MAE ${input.maeScore.toFixed(1)} + LLM ${llmResult.score} -> ${finalScore.toFixed(1)} (threshold ${config.passThreshold}).`,

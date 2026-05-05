@@ -1,30 +1,22 @@
 import { compileAndRender } from './pipeline';
 import { computeMAEResult } from './mae';
 import type { Challenge, JudgeResult, LLMJudgeFn } from './types';
+import { applyBandLogic, DEFAULT_BANDS, type BandConfig } from '../ai/bandLogic';
 
-// ─── Band thresholds ──────────────────────────────────────────────────────────
-// AI Systems & Integration owns calibration of these values.
-// MAE score above HIGH → confident pass, skip LLM.
-// MAE score below LOW  → confident fail, skip LLM.
-// Between LOW and HIGH → borderline, invoke LLM to decide.
-// Keeping the band narrow minimises API calls.
-
-const MAE_HIGH = 90; // confident pass
-const MAE_LOW  = 30; // confident fail
-
-// Final score blend when LLM is invoked.
-// MAE confirms the visual is in the right ballpark; LLM makes the qualitative call.
-const MAE_WEIGHT = 0.4;
-const LLM_WEIGHT = 0.6;
-
-const PASS_THRESHOLD = 70;
-
-// ─── Main entry point ─────────────────────────────────────────────────────────
+// ─── Plumbing only ────────────────────────────────────────────────────────────
+// Band thresholds, weights, and the pass threshold live in src/ai/bandLogic.ts
+// (owned by AI Systems & Integration). This file owns pipeline orchestration:
+// compile both shaders, compute MAE, hand the decision to applyBandLogic, and
+// shape the result as JudgeResult for consumers.
+//
+// Callers may pass a custom BandConfig for tests or experiments; production
+// uses DEFAULT_BANDS.
 
 export async function judge(
   userShaderSrc: string,
   challenge: Challenge,
   llmJudge: LLMJudgeFn,
+  bandConfig: BandConfig = DEFAULT_BANDS,
 ): Promise<JudgeResult> {
   const judgeStart = performance.now();
 
@@ -49,54 +41,29 @@ export async function judge(
   const maeResult = computeMAEResult(userRender, refRender, challenge.tolerance, challenge.useBlur);
   const maeScore  = maeResult.score;
 
-  // Confident pass — skip LLM
-  if (maeScore >= MAE_HIGH) {
-    return {
-      maeScore,
-      llmScore: null,
-      finalScore: maeScore,
-      passed: true,
-      breakdown: { maeRaw: maeResult.rawMae, stageTwoInvoked: false },
-      renderLatencyMs,
-      judgeLatencyMs: performance.now() - judgeStart,
-    };
-  }
-
-  // Confident fail — skip LLM
-  if (maeScore < MAE_LOW) {
-    return {
-      maeScore,
-      llmScore: null,
-      finalScore: maeScore,
-      passed: false,
-      breakdown: { maeRaw: maeResult.rawMae, stageTwoInvoked: false },
-      renderLatencyMs,
-      judgeLatencyMs: performance.now() - judgeStart,
-    };
-  }
-
-  // Stage 2: borderline — invoke LLM
-  const llmOutput = await llmJudge({
-    userRender,
-    referenceRender: refRender,
-    userShaderSrc,
-    challenge,
+  // Stage 2 decision tree — delegated to bandLogic so calibration and
+  // production share a single source of truth for thresholds and weights.
+  const band = await applyBandLogic({
+    maeScore,
+    config: bandConfig,
+    callLLM: () => llmJudge({
+      userRender,
+      referenceRender: refRender,
+      userShaderSrc,
+      challenge,
+    }),
   });
-
-  const llmScore   = llmOutput.score;
-  const finalScore = Math.round(MAE_WEIGHT * maeScore + LLM_WEIGHT * llmScore);
-  // A flagged shader (cheating detected) always fails, regardless of score.
-  const passed = !llmOutput.flagged && finalScore >= PASS_THRESHOLD;
 
   return {
     maeScore,
-    llmScore,
-    finalScore,
-    passed,
+    llmScore: band.llmResult?.score ?? null,
+    finalScore: Math.round(band.finalScore),
+    passed: band.passed,
     breakdown: {
       maeRaw: maeResult.rawMae,
-      llmReasoning: llmOutput.reasoning,
-      stageTwoInvoked: true,
+      llmReasoning: band.llmResult?.reasoning,
+      stageTwoInvoked: band.llmInvoked,
+      llmUnavailable: band.llmUnavailable ? true : undefined,
     },
     renderLatencyMs,
     judgeLatencyMs: performance.now() - judgeStart,

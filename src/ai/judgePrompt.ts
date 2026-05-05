@@ -3,9 +3,10 @@
 // Vision-judge prompt for Claude Opus 4.7. Override the model string here -
 // do not let tooling guess at older names from training data.
 
-import type { LLMJudgeFn } from '../judge/llm';
+import type { LLMJudgeFn, LLMJudgeOutput } from '../judge/types';
 
-export const JUDGE_MODEL = 'claude-opus-4-7';
+// Re-export from the shared client to keep a single source of truth.
+export { JUDGE_MODEL } from './anthropic';
 
 export interface JudgePromptResponse {
   visualMatchScore: number;
@@ -13,6 +14,19 @@ export interface JudgePromptResponse {
   passReasoning: string;
   flagged: boolean;
   flagReason: string | null;
+}
+
+// Adapter: bridges the prompt's structured JSON response to the
+// LLMJudgeFn contract the combiner consumes. Flagged shaders carry
+// the flagReason in `reasoning` so the UI can surface it.
+export function toLLMJudgeOutput(response: JudgePromptResponse): LLMJudgeOutput {
+  return {
+    score: response.visualMatchScore,
+    reasoning: response.flagged
+      ? (response.flagReason ?? response.passReasoning)
+      : response.passReasoning,
+    flagged: response.flagged,
+  };
 }
 
 export const JUDGE_SYSTEM_PROMPT = `You are a fair, diagnostic judge for a GLSL shader learning platform.

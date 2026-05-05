@@ -19,6 +19,7 @@ export interface JudgeResult {
     maeRaw: number;
     llmReasoning?: string;
     stageTwoInvoked: boolean;
+    llmUnavailable?: boolean;
   };
   renderLatencyMs: number;
   judgeLatencyMs: number;
