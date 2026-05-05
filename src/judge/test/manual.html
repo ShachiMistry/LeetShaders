@@ -97,6 +97,9 @@
     <span class="tolerance-row">
       tolerance: <input id="tolerance" type="number" value="10" min="0.1" step="0.5" />
     </span>
+    <label class="tolerance-row" style="cursor:pointer">
+      <input type="checkbox" id="useBlur" /> blur pre-pass
+    </label>
   </div>
 
   <div id="scorePanel">
@@ -210,7 +213,8 @@ void main() {
         return;
       }
       const tolerance = parseFloat(document.getElementById('tolerance').value) || 10;
-      const result = computeMAEResult(lastUserBuf, lastRefBuf, tolerance);
+      const useBlur = document.getElementById('useBlur').checked;
+      const result = computeMAEResult(lastUserBuf, lastRefBuf, tolerance, useBlur);
 
       const panel = document.getElementById('scorePanel');
       const val   = document.getElementById('scoreValue');

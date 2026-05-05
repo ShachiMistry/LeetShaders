@@ -57,6 +57,10 @@ function getGL(): WebGL2RenderingContext {
   return gl;
 }
 
+export function getContext(): WebGL2RenderingContext {
+  return getGL();
+}
+
 // Parses GLSL info log lines into structured errors.
 // Handles both ANGLE format "ERROR: 0:5: msg" and bare "0:5: msg".
 function parseInfoLog(log: string): { line: number; message: string }[] {
