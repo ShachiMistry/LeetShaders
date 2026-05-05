@@ -144,9 +144,9 @@ export function computeMAE(bufferA: Uint8Array, bufferB: Uint8Array): number {
   let sum = 0;
   const pixelCount = bufferA.length / 4;
   for (let i = 0; i < bufferA.length; i += 4) {
-    sum += Math.abs(bufferA[i]     - bufferB[i]);
-    sum += Math.abs(bufferA[i + 1] - bufferB[i + 1]);
-    sum += Math.abs(bufferA[i + 2] - bufferB[i + 2]);
+    sum += Math.abs((bufferA[i] ?? 0)     - (bufferB[i] ?? 0));
+    sum += Math.abs((bufferA[i + 1] ?? 0) - (bufferB[i + 1] ?? 0));
+    sum += Math.abs((bufferA[i + 2] ?? 0) - (bufferB[i + 2] ?? 0));
   }
   return sum / (pixelCount * 3);
 }

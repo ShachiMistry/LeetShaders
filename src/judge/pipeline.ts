@@ -107,7 +107,7 @@ function parseInfoLog(log: string): { line: number; message: string }[] {
     if (!line) continue;
     const m = line.match(/(?:ERROR:\s*\d+:(\d+):|(\d+):(\d+):)\s*(.+)/);
     if (m) {
-      const lineNum = parseInt(m[1] ?? m[3], 10);
+      const lineNum = parseInt(m[1] ?? m[3] ?? '0', 10);
       const msg = (m[4] ?? '').trim();
       results.push({ line: lineNum, message: msg });
     } else {
