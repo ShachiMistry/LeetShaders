@@ -1,0 +1,10 @@
+{
+  "id": "7f61c3b1-9a7e-4b41-9a7e-4b419a7e4b41",
+  "slug": "solid-color",
+  "title": "Sky Blue",
+  "description": "Render a solid 'Sky Blue' color across the entire canvas. The target RGB value is (135, 206, 235).",
+  "difficulty": "beginner",
+  "tolerance": 5.0,
+  "useBlur": false,
+  "hintText": "Use gl_FragColor (or fragColor in WebGL2) to set the output color. Remember to normalize your RGB values by dividing them by 255.0."
+}

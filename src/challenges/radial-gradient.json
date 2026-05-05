@@ -1,0 +1,10 @@
+{
+  "id": "d4e5f6a1-b2c3-4d5e-8f9a-0b1c2d3e4f5a",
+  "slug": "radial-gradient",
+  "title": "Cosmic Core",
+  "description": "Create a radial gradient that starts as pure white in the center and transitions to a deep purple (0.2, 0.0, 0.4) towards the edges. The gradient should be circular, even if the screen is rectangular.",
+  "difficulty": "intermediate",
+  "tolerance": 10.0,
+  "useBlur": true,
+  "hintText": "You'll need to center your UV coordinates first. Use length(uv) to get the distance from the center, and mix() with smoothstep() to create the color transition."
+}

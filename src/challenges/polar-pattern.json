@@ -1,0 +1,10 @@
+{
+  "id": "f6a1b2c3-d4e5-4f6a-8b9c-0d1e2f3a4b5c",
+  "slug": "polar-pattern",
+  "title": "Neon Blossom",
+  "description": "Render a 6-petaled magenta (1.0, 0.0, 1.0) flower pattern using polar coordinates. The shape is defined by the distance from center r and the angle a.",
+  "difficulty": "intermediate",
+  "tolerance": 12.0,
+  "useBlur": true,
+  "hintText": "Convert your UVs to polar coordinates using length() for radius and atan(y, x) for angle. Try using a cosine function on the angle to modulate the radius of the shape."
+}

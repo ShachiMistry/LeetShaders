@@ -1,0 +1,10 @@
+{
+  "id": "e5f6a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b",
+  "slug": "raymarched-sphere",
+  "title": "Orbital Geometry",
+  "description": "Implement a basic raymarching engine to render a 3D-shaded sphere. The sphere should have diffuse lighting and a specular highlight.",
+  "difficulty": "advanced",
+  "tolerance": 20.0,
+  "useBlur": true,
+  "hintText": "This is a full raymarching pipeline. You need a camera setup (ro, rd), a scene SDF (sphere), a marching loop, and a normal calculation function (finite difference). Once you find a hit, use dot(normal, light_dir) for basic shading."
+}

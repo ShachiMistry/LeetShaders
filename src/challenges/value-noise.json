@@ -1,0 +1,10 @@
+{
+  "id": "e5f6a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b",
+  "slug": "value-noise",
+  "title": "Static Mist",
+  "description": "Implement a 2D Value Noise function. The output should be a grayscale noise pattern scaled by 10.0 across the canvas.",
+  "difficulty": "intermediate",
+  "tolerance": 15.0,
+  "useBlur": true,
+  "hintText": "You'll need a hash/pseudo-random function first. Then, for any point, find the 4 surrounding integer grid points, get their random values, and bilinearly interpolate between them using a smooth curve like f*f*(3.0-2.0*f)."
+}
