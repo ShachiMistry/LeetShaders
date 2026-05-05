@@ -1,0 +1,8 @@
+{
+  "id": "challenge-001",
+  "title": "Solid Magenta",
+  "description": "Render a solid magenta color (1.0, 0.0, 1.0) across the entire quad. This is the warm-up challenge used to smoke-test the judge pipeline.",
+  "difficulty": "beginner",
+  "tolerance": 0.02,
+  "useBlur": false
+}
