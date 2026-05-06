@@ -1,81 +1,115 @@
-import { Box, Chip, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import { useColors } from '../hooks/useColors';
 import type { JudgeResult } from '../judge/types';
 
-interface ResultPanelProps {
+interface RunResult {
+  kind: 'run';
+  mae: number;
+  score: number;
+}
+
+interface SubmitResult {
+  kind: 'submit';
   result: JudgeResult;
 }
 
-export default function ResultPanel({ result }: ResultPanelProps) {
+export type ResultData = RunResult | SubmitResult;
+
+interface ResultPanelProps {
+  data: ResultData;
+}
+
+export default function ResultPanel({ data }: ResultPanelProps) {
+  if (data.kind === 'run') {
+    return <RunResultView mae={data.mae} score={data.score} />;
+  }
+  return <SubmitResultView result={data.result} />;
+}
+
+function RunResultView({ mae, score }: { mae: number; score: number }) {
+  const colors = useColors();
+  const statusColor = score >= 90 ? colors.success : score >= 50 ? colors.warning : colors.danger;
+  const statusLabel = score >= 90 ? 'Looks correct' : score >= 50 ? 'Partially matching' : 'Not matching';
+  const StatusIcon = score >= 90 ? CheckCircleOutlineIcon : CancelOutlinedIcon;
+
   return (
-    <Box
-      sx={{
-        p: 2,
-        border: '1px solid',
-        borderColor: result.passed ? 'success.main' : 'error.main',
-        borderRadius: 2,
-        background: result.passed ? 'rgba(46, 125, 50, 0.08)' : 'rgba(211, 47, 47, 0.08)',
-      }}
-      role="region"
-      aria-label="Submission result"
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-        <Typography variant="h3" component="span" sx={{ fontWeight: 700 }}>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        <StatusIcon sx={{ fontSize: 15, color: statusColor }} />
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: statusColor }}>
+          {statusLabel}
+        </Typography>
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: colors.textPrimary, ml: 'auto', fontFamily: '"JetBrains Mono", monospace' }}>
+          {score}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <ScoreItem label="Score" value={String(score)} />
+        <ScoreItem label="MAE" value={mae.toFixed(4)} />
+      </Box>
+      <Typography sx={{ fontSize: '0.6rem', color: colors.textTertiary, mt: 1 }}>
+        Quick check only. Submit for the full judge.
+      </Typography>
+    </Box>
+  );
+}
+
+function SubmitResultView({ result }: { result: JudgeResult }) {
+  const colors = useColors();
+  const statusColor = result.passed ? colors.success : colors.danger;
+  const StatusIcon = result.passed ? CheckCircleOutlineIcon : CancelOutlinedIcon;
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        <StatusIcon sx={{ fontSize: 15, color: statusColor }} />
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: statusColor }}>
+          {result.passed ? 'Accepted' : 'Wrong Answer'}
+        </Typography>
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: colors.textPrimary, ml: 'auto', fontFamily: '"JetBrains Mono", monospace' }}>
           {result.finalScore}
         </Typography>
-        <Chip
-          icon={result.passed ? <CheckCircleOutlineIcon /> : <CancelOutlinedIcon />}
-          label={result.passed ? 'Passed' : 'Failed'}
-          color={result.passed ? 'success' : 'error'}
-          variant="outlined"
-          aria-label={result.passed ? 'Result: Passed' : 'Result: Failed'}
-        />
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 1 }}>
-        <Detail label="MAE Score" value={result.maeScore.toFixed(1)} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <ScoreItem label="MAE" value={result.maeScore.toFixed(1)} />
+        <ScoreItem label="MAE Raw" value={result.breakdown.maeRaw.toFixed(4)} />
         {result.llmScore != null && (
-          <Detail label="LLM Score" value={result.llmScore.toFixed(1)} />
+          <ScoreItem label="LLM Score" value={result.llmScore.toFixed(1)} />
         )}
-        <Detail label="MAE Raw" value={result.breakdown.maeRaw.toFixed(4)} />
       </Box>
 
       {result.breakdown.stageTwoInvoked && result.breakdown.llmReasoning && (
         <Box sx={{ mt: 1.5 }}>
-          <Typography variant="caption" color="text.secondary">
-            LLM Reasoning
+          <Typography sx={{ fontSize: '0.6rem', color: colors.textTertiary, mb: 0.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Reasoning
           </Typography>
-          <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
+          <Typography sx={{ fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.5, fontFamily: '"JetBrains Mono", monospace', whiteSpace: 'pre-wrap' }}>
             {result.breakdown.llmReasoning}
           </Typography>
         </Box>
       )}
 
-      <Box sx={{ mt: 1.5, display: 'flex', gap: 2, opacity: 0.5 }}>
-        <Typography variant="caption">
-          Render: {result.renderLatencyMs.toFixed(0)}ms
+      <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
+        <Typography sx={{ fontSize: '0.58rem', color: colors.textTertiary }}>
+          Render {result.renderLatencyMs.toFixed(0)}ms
         </Typography>
-        <Typography variant="caption">
-          Judge: {result.judgeLatencyMs.toFixed(0)}ms
+        <Typography sx={{ fontSize: '0.58rem', color: colors.textTertiary }}>
+          Judge {result.judgeLatencyMs.toFixed(0)}ms
         </Typography>
-        {result.breakdown.stageTwoInvoked && (
-          <Typography variant="caption">Stage 2 invoked</Typography>
-        )}
       </Box>
     </Box>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function ScoreItem({ label, value }: { label: string; value: string }) {
+  const colors = useColors();
   return (
-    <Box>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-        {value}
-      </Typography>
+    <Box sx={{ px: 1.5, py: 0.75, borderRadius: 0.5, backgroundColor: colors.bg, border: `1px solid ${colors.border}` }}>
+      <Typography sx={{ fontSize: '0.58rem', color: colors.textTertiary, mb: 0.25 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: colors.textPrimary, fontFamily: '"JetBrains Mono", monospace' }}>{value}</Typography>
     </Box>
   );
 }

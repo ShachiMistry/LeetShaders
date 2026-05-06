@@ -1,5 +1,5 @@
 {
-  "id": "e5f6a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b",
+  "id": "f7a2b3c4-d5e6-4f7a-9b0c-1d2e3f4a5b6c",
   "slug": "raymarched-sphere",
   "title": "Orbital Geometry",
   "description": "Implement a basic raymarching engine to render a 3D-shaded sphere. The sphere should have diffuse lighting and a specular highlight.",

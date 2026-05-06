@@ -4,13 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <meta
       name="description"
       content="LeetShaders - a browser-native GLSL shader coding challenge platform."
     />
     <title>LeetShaders</title>
   </head>
-  <body>
+  <body style="margin:0">
+    <script>document.body.style.background=localStorage.getItem('ls_theme_mode')==='light'?'#ffffff':'#0d1117'</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

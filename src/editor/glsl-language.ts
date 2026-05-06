@@ -1,11 +1,3 @@
-// Editor & UI Lead owns this file. See EDITOR_LEAD.md task 1.
-//
-// GLSL is not a built-in Monaco language. Register it once, up front, before
-// mounting any editor that requests `language: 'glsl'`.
-//
-// The tokenizer below is a starter skeleton - complete the keyword, builtin,
-// and number-literal lists against the GLSL ES 3.0 spec before shipping.
-
 import type * as Monaco from 'monaco-editor';
 
 let registered = false;
@@ -33,7 +25,14 @@ export function registerGLSL(monaco: typeof Monaco): void {
 
   monaco.languages.setMonarchTokensProvider('glsl', {
     defaultToken: '',
-    keywords: [
+    controlKeywords: [
+      'if', 'else', 'for', 'while', 'do', 'return', 'break', 'continue',
+      'discard', 'struct', 'const',
+      'uniform', 'varying', 'attribute',
+      'in', 'out', 'inout',
+      'precision', 'lowp', 'mediump', 'highp',
+    ],
+    typeKeywords: [
       'void', 'bool', 'int', 'uint', 'float', 'double',
       'vec2', 'vec3', 'vec4',
       'bvec2', 'bvec3', 'bvec4',
@@ -41,11 +40,6 @@ export function registerGLSL(monaco: typeof Monaco): void {
       'uvec2', 'uvec3', 'uvec4',
       'mat2', 'mat3', 'mat4', 'mat2x3', 'mat3x2', 'mat3x4', 'mat4x3',
       'sampler2D', 'samplerCube',
-      'uniform', 'varying', 'attribute',
-      'in', 'out', 'inout',
-      'precision', 'lowp', 'mediump', 'highp',
-      'if', 'else', 'for', 'while', 'do', 'return', 'break', 'continue',
-      'discard', 'struct', 'const',
     ],
     builtins: [
       'texture', 'texture2D', 'textureCube',
@@ -64,6 +58,7 @@ export function registerGLSL(monaco: typeof Monaco): void {
       root: [
         [/\/\/.*$/, 'comment'],
         [/\/\*/, 'comment', '@blockComment'],
+        [/#\w+/, 'preprocessor'],
         [/\b\d+\.\d*([eE][+-]?\d+)?[fF]?\b/, 'number.float'],
         [/\b\d+[fF]\b/, 'number.float'],
         [/\b\d+\b/, 'number'],
@@ -71,14 +66,15 @@ export function registerGLSL(monaco: typeof Monaco): void {
           /[a-zA-Z_]\w*/,
           {
             cases: {
-              '@keywords': 'keyword',
-              '@builtins': 'support.function',
-              '@glVars': 'variable.predefined',
+              '@controlKeywords': 'keyword',
+              '@typeKeywords': 'type',
+              '@builtins': 'function',
+              '@glVars': 'variable',
               '@default': 'identifier',
             },
           },
         ],
-        [/[{}()[\]]/, '@brackets'],
+        [/[{}()[\]]/, 'delimiter.bracket'],
         [/[;,.]/, 'delimiter'],
         [/[=+\-*/%<>!&|^~?:]/, 'operator'],
       ],
