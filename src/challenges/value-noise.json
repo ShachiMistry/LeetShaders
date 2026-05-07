@@ -6,6 +6,5 @@
   "difficulty": "intermediate",
   "tolerance": 15.0,
   "useBlur": true,
-  "category": "Textures",
   "hintText": "You'll need a hash/pseudo-random function first. Then, for any point, find the 4 surrounding integer grid points, get their random values, and bilinearly interpolate between them using a smooth curve like f*f*(3.0-2.0*f)."
 }

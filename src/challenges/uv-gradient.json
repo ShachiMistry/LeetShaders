@@ -6,6 +6,5 @@
   "difficulty": "beginner",
   "tolerance": 8.0,
   "useBlur": true,
-  "category": "Fundamentals",
   "hintText": "You need to calculate the UV coordinates by dividing gl_FragCoord.xy by u_resolution.xy. The x-coordinate of your UV will determine the color intensity."
 }

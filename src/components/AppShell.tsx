@@ -39,25 +39,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               fontSize: '0.9rem',
               color: colors.textPrimary,
               letterSpacing: '-0.02em',
-              mr: 3
             }}
           >
             LeetShaders
-          </Typography>
-
-          <Typography
-            component={Link}
-            to="/roadmap"
-            sx={{
-              textDecoration: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 500,
-              color: colors.textSecondary,
-              '&:hover': { color: colors.textPrimary },
-              transition: 'color 0.2s'
-            }}
-          >
-            Roadmap
           </Typography>
 
           <Box sx={{ flex: 1 }} />

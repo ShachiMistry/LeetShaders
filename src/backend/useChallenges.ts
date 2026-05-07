@@ -41,7 +41,6 @@ export function useChallenges(): UseChallengesResult {
         title: r.title as string,
         description: r.description as string,
         difficulty: r.difficulty as Challenge['difficulty'],
-        category: r.category as string,
         referenceShaderSrc: r.reference_shader_src as string,
         tolerance: r.tolerance as number,
         useBlur: r.use_blur as boolean,
@@ -99,7 +98,6 @@ export function useChallenge(slug: string): UseChallengeResult {
         title: row.title as string,
         description: row.description as string,
         difficulty: row.difficulty as Challenge['difficulty'],
-        category: row.category as string,
         referenceShaderSrc: row.reference_shader_src as string,
         tolerance: row.tolerance as number,
         useBlur: row.use_blur as boolean,
@@ -122,50 +120,12 @@ export function useChallenge(slug: string): UseChallengeResult {
   return { data, loading };
 }
 
-export async function submitSolve(challengeId: string, score: number, shaderSrc: string, passed: boolean): Promise<void> {
+export async function submitSolve(challengeId: string, score: number, shaderSrc: string): Promise<void> {
   if (!SUPABASE_CONFIGURED) return;
   const { error } = await supabase.from('solves').insert({
     challenge_id: challengeId,
     score,
     shader_src: shaderSrc,
-    passed,
   });
   if (error) throw new Error(error.message);
-}
-
-export interface Solve {
-  id: string;
-  challenge_id: string;
-  score: number;
-  shader_src: string;
-  passed: boolean;
-  created_at: string;
-}
-
-export function useSolves() {
-  const [solves, setSolves] = useState<Solve[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!SUPABASE_CONFIGURED) {
-      setLoading(false);
-      return;
-    }
-
-    async function fetchSolves() {
-      const { data, error } = await supabase
-        .from('solves')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setSolves(data as Solve[]);
-      }
-      setLoading(false);
-    }
-
-    fetchSolves();
-  }, []);
-
-  return { solves, loading };
 }

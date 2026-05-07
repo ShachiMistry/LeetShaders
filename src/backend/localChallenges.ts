@@ -47,7 +47,6 @@ function toChallenge(meta: Record<string, unknown>, glsl: string): Challenge {
     title: meta.title as string,
     description: meta.description as string,
     difficulty: meta.difficulty as Challenge['difficulty'],
-    category: meta.category as string,
     referenceShaderSrc: glsl,
     tolerance: meta.tolerance as number,
     useBlur: meta.useBlur as boolean,
