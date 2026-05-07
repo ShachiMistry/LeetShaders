@@ -15,8 +15,11 @@ import circleSdfGlsl from '../challenges/circle-sdf.glsl?raw';
 import radialGradientJson from '../challenges/radial-gradient.json';
 import radialGradientGlsl from '../challenges/radial-gradient.glsl?raw';
 
-import valueNoiseJson from '../challenges/value-noise.json';
-import valueNoiseGlsl from '../challenges/value-noise.glsl?raw';
+import boxSdfJson from '../challenges/box-sdf.json';
+import boxSdfGlsl from '../challenges/box-sdf.glsl?raw';
+
+import hsvColorWheelJson from '../challenges/hsv-color-wheel.json';
+import hsvColorWheelGlsl from '../challenges/hsv-color-wheel.glsl?raw';
 
 import polarPatternJson from '../challenges/polar-pattern.json';
 import polarPatternGlsl from '../challenges/polar-pattern.glsl?raw';
@@ -34,8 +37,9 @@ const files: ChallengeFile[] = [
   { meta: uvGradientJson, glsl: uvGradientGlsl },
   { meta: checkerboardJson, glsl: checkerboardGlsl },
   { meta: circleSdfJson, glsl: circleSdfGlsl },
+  { meta: boxSdfJson, glsl: boxSdfGlsl },
   { meta: radialGradientJson, glsl: radialGradientGlsl },
-  { meta: valueNoiseJson, glsl: valueNoiseGlsl },
+  { meta: hsvColorWheelJson, glsl: hsvColorWheelGlsl },
   { meta: polarPatternJson, glsl: polarPatternGlsl },
   { meta: raymarchedSphereJson, glsl: raymarchedSphereGlsl },
 ];
