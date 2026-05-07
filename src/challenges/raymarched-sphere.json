@@ -6,5 +6,6 @@
   "difficulty": "advanced",
   "tolerance": 20.0,
   "useBlur": true,
+  "category": "Advanced Effects",
   "hintText": "This is a full raymarching pipeline. You need a camera setup (ro, rd), a scene SDF (sphere), a marching loop, and a normal calculation function (finite difference). Once you find a hit, use dot(normal, light_dir) for basic shading."
 }

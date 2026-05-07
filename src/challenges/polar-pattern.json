@@ -6,5 +6,6 @@
   "difficulty": "intermediate",
   "tolerance": 12.0,
   "useBlur": true,
+  "category": "2D Patterns",
   "hintText": "Convert your UVs to polar coordinates using length() for radius and atan(y, x) for angle. Try using a cosine function on the angle to modulate the radius of the shape."
 }

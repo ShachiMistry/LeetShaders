@@ -11,14 +11,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Monaco from '../editor/Monaco';
 import LivePreview from '../editor/LivePreview';
 import ErrorConsole from '../editor/ErrorConsole';
 import ResultPanel from '../editor/ResultPanel';
 import type { ResultData } from '../editor/ResultPanel';
-import { useChallenge, submitSolve } from '../backend/useChallenges';
+import { useChallenge, submitSolve, useChallenges } from '../backend/useChallenges';
 import { judge } from '../judge/combiner';
 import { llmJudge } from '../judge/llm';
 import { computeMAEResult } from '../judge/mae';
@@ -143,8 +143,10 @@ function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
 
 export default function ChallengePage() {
   const colors = useColors();
+  const navigate = useNavigate();
   const { slug = '' } = useParams();
   const { data: challenge, loading } = useChallenge(slug);
+  const { data: allChallenges } = useChallenges();
   const [src, setSrc] = useState(STARTER);
   const [debouncedSrc, setDebouncedSrc] = useState(STARTER);
   const [errors, setErrors] = useState<PipelineError[]>([]);
@@ -449,9 +451,36 @@ export default function ChallengePage() {
             size="small"
             onClick={handleSubmit}
             disabled={submitting || hasCompileError}
+            sx={{ mr: 1 }}
           >
             {submitting ? 'Judging...' : 'Submit'}
           </Button>
+
+          {/* Next/Prev Buttons */}
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={!allChallenges || allChallenges.findIndex(c => c.slug === slug) === 0}
+              onClick={() => {
+                const idx = allChallenges!.findIndex(c => c.slug === slug);
+                if (idx > 0) navigate(`/challenges/${allChallenges![idx - 1].slug}`);
+              }}
+            >
+              Prev
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={!allChallenges || allChallenges.findIndex(c => c.slug === slug) === allChallenges.length - 1}
+              onClick={() => {
+                const idx = allChallenges!.findIndex(c => c.slug === slug);
+                if (idx < allChallenges!.length - 1) navigate(`/challenges/${allChallenges![idx + 1].slug}`);
+              }}
+            >
+              Next
+            </Button>
+          </Box>
 
           <Typography sx={{ ml: 'auto', fontSize: '0.65rem', color: colors.textTertiary, fontFamily: '"JetBrains Mono", monospace' }}>
             GLSL ES 3.0

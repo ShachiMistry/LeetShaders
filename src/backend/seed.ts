@@ -19,7 +19,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const CHALLENGES_DIR = './src/challenges';
 
 async function seed() {
-  console.log('Starting challenge seed process...');
+  console.log('🚀 Starting challenge seed process...');
+  console.log('🔗 URL:', process.env.VITE_SUPABASE_URL);
+  console.log('🔑 Key detected:', process.env.VITE_SUPABASE_ANON_KEY ? 'Yes' : 'No');
 
   try {
     const files = fs.readdirSync(CHALLENGES_DIR);

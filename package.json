@@ -23,6 +23,7 @@
     "@mui/icons-material": "7.3.9",
     "@mui/material": "7.3.9",
     "@supabase/supabase-js": "2.47.10",
+    "framer-motion": "^12.38.0",
     "monaco-editor": "0.52.2",
     "react": "19.0.0",
     "react-dom": "19.0.0",

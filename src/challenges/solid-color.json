@@ -6,5 +6,6 @@
   "difficulty": "beginner",
   "tolerance": 5.0,
   "useBlur": false,
+  "category": "Fundamentals",
   "hintText": "Use gl_FragColor (or fragColor in WebGL2) to set the output color. Remember to normalize your RGB values by dividing them by 255.0."
 }

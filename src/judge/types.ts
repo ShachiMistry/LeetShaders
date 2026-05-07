@@ -5,6 +5,7 @@ export interface Challenge {
   description: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   referenceShaderSrc: string;
+  category: string;
   tolerance: number;
   useBlur: boolean;
   hintText?: string;
