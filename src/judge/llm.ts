@@ -1,4 +1,5 @@
 import type { LLMJudgeFn, LLMJudgeInput, LLMJudgeOutput } from './types';
+import { llmJudge as realJudge } from '../ai/judgePrompt';
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 // Keyed by (challenge_id, shader_hash) so identical submissions never hit the
@@ -21,19 +22,9 @@ function cacheKey(challengeId: string, shaderSrc: string): string {
 
 const cache = new Map<string, LLMJudgeOutput>();
 
-// ─── Stub ─────────────────────────────────────────────────────────────────────
-// AI Systems & Integration replaces this with the real Anthropic API call.
-// The stub lets the rest of the pipeline (combiner, test harness) work without
-// burning any API credits.
-
-const stubJudge: LLMJudgeFn = async (_input: LLMJudgeInput): Promise<LLMJudgeOutput> => {
-  return { score: 75, reasoning: 'stub — AI Systems will replace this', flagged: false };
-};
-
 // ─── Cached wrapper ───────────────────────────────────────────────────────────
 // This is what the combiner calls. It checks the cache first and only invokes
-// the inner judge on a miss. AI Systems should wrap their real implementation
-// with this same pattern when they replace the stub.
+// the inner judge on a miss.
 
 export function withCache(judge: LLMJudgeFn): LLMJudgeFn {
   return async (input: LLMJudgeInput): Promise<LLMJudgeOutput> => {
@@ -50,6 +41,5 @@ export function clearCache(): void {
   cache.clear();
 }
 
-// Default export: stub wrapped in cache.
-// Combiner imports this. AI Systems swaps the inner function when ready.
-export const llmJudge: LLMJudgeFn = withCache(stubJudge);
+// Default export: real judge wrapped in cache.
+export const llmJudge: LLMJudgeFn = withCache(realJudge);

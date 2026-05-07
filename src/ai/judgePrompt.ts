@@ -3,7 +3,9 @@
 // Vision-judge prompt for Claude Opus 4.7. Override the model string here -
 // do not let tooling guess at older names from training data.
 
-import type { LLMJudgeFn, LLMJudgeOutput } from '../judge/types';
+import type { LLMJudgeFn, LLMJudgeInput, LLMJudgeOutput } from '../judge/types';
+import { JUDGE_MODEL, callAnthropic, type ContentBlock } from './anthropic';
+import { rgbaToPngBase64 } from './imageEncode';
 
 // Re-export from the shared client to keep a single source of truth.
 export { JUDGE_MODEL } from './anthropic';
@@ -51,9 +53,65 @@ Return ONLY valid JSON matching this schema:
   "flagReason": string | null
 }`;
 
-// STUB. Replace with a real Anthropic SDK call. The judge stub in
-// src/judge/llm.ts continues to satisfy the LLMJudgeFn contract until this
-// is wired up.
-export const llmJudge: LLMJudgeFn = async () => {
-  throw new Error('judgePrompt.ts not implemented yet - see AI_SYSTEMS.md task 1');
+const RENDER_SIZE = 512;
+
+const JUDGE_TOOL = {
+  name: 'judge_output',
+  description: 'Return structured judge result',
+  schema: {
+    type: 'object',
+    properties: {
+      visualMatchScore: { type: 'number' },
+      codeQualityNote: { type: 'string' },
+      passReasoning: { type: 'string' },
+      flagged: { type: 'boolean' },
+      flagReason: { type: ['string', 'null'] },
+    },
+    required: ['visualMatchScore', 'codeQualityNote', 'passReasoning', 'flagged', 'flagReason'],
+  },
+};
+
+function buildUserContent(
+  input: LLMJudgeInput,
+  userPng: string,
+  referencePng: string,
+): ContentBlock[] {
+  const challengeBlock = [
+    `Challenge: ${input.challenge.title} (${input.challenge.difficulty})`,
+    input.challenge.description,
+  ].join('\n');
+
+  return [
+    // Challenge description is stable per challenge — mark cacheable.
+    { type: 'text', text: challengeBlock, cacheControl: 'ephemeral' },
+    { type: 'text', text: 'Reference render:' },
+    { type: 'image', mediaType: 'image/png', base64: referencePng, cacheControl: 'ephemeral' },
+    { type: 'text', text: 'User render:' },
+    { type: 'image', mediaType: 'image/png', base64: userPng },
+    {
+      type: 'text',
+      text: `User shader source:\n\`\`\`glsl\n${input.userShaderSrc}\n\`\`\``,
+    },
+    {
+      type: 'text',
+      text: 'Call judge_output with your verdict.',
+    },
+  ];
+}
+
+export const llmJudge: LLMJudgeFn = async (input: LLMJudgeInput): Promise<LLMJudgeOutput> => {
+  const [userPng, referencePng] = await Promise.all([
+    rgbaToPngBase64(input.userRender, RENDER_SIZE, RENDER_SIZE),
+    rgbaToPngBase64(input.referenceRender, RENDER_SIZE, RENDER_SIZE),
+  ]);
+
+  const result = await callAnthropic<JudgePromptResponse>({
+    model: JUDGE_MODEL,
+    system: JUDGE_SYSTEM_PROMPT,
+    userContent: buildUserContent(input, userPng, referencePng),
+    maxTokens: 512,
+    jsonSchema: JUDGE_TOOL,
+  });
+
+  return toLLMJudgeOutput(result.content);
 };
