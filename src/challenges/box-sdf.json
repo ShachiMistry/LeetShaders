@@ -1,0 +1,10 @@
+{
+  "id": "a2b3c4d5-e6f7-4a2b-9c0d-1e2f3a4b5c6d",
+  "slug": "box-sdf",
+  "title": "The Rectangle Theorem",
+  "description": "Render a centered white rounded rectangle on a black background using a Signed Distance Function. The box has half-extents of (0.5, 0.3) in normalized [-1, 1] space with a corner radius of 0.08. Use smoothstep for anti-aliased edges.",
+  "difficulty": "beginner",
+  "tolerance": 5.0,
+  "useBlur": false,
+  "hintText": "Start with the standard box SDF: vec2 d = abs(p) - halfExtents. For rounded corners, inset the box by the corner radius r before applying the SDF, then subtract r at the end. Combine length(max(d, 0.0)) and min(max(d.x, d.y), 0.0) to handle all regions correctly."
+}

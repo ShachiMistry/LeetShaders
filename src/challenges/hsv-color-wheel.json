@@ -1,0 +1,10 @@
+{
+  "id": "b3c4d5e6-f7a8-4b3c-9d0e-2f3a4b5c6d7e",
+  "slug": "hsv-color-wheel",
+  "title": "Spectrum Ring",
+  "description": "Render a circular HSV color wheel in normalized [-1, 1] space. The hue is determined by the angle around the center, saturation by the distance from the center, and value is always 1.0. Clip the wheel to a hard edge at radius 0.9 — outside should be black.",
+  "difficulty": "intermediate",
+  "tolerance": 8.0,
+  "useBlur": false,
+  "hintText": "Use atan(uv.y, uv.x) to get the angle and length(uv) for the radius. Map the angle to a hue in [0, 1] by dividing by 2*PI and offsetting by 0.5. Then implement HSV to RGB conversion: the hue selects which pair of channels to interpolate between."
+}
