@@ -16,8 +16,7 @@ const Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-// Extend the default 10s limit — Opus vision calls can take 15–20s.
-export const maxDuration = 60;
+// maxDuration is declared in vercel.json (60s) — no export needed here.
 
 // ─── Request / response types (mirrors src/ai/anthropic.ts) ──────────────────
 
@@ -103,7 +102,7 @@ function readBody(req: IncomingMessage): Promise<AnthropicCallInput> {
   });
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+module.exports = async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST') {
     return send(res, 405, { error: 'Method not allowed' });
   }
