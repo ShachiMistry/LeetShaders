@@ -31,3 +31,4 @@ dist-ssr
 .env.production.local
 
 CONTRIBUTION_REPORT_NEIL.md
+.vercel

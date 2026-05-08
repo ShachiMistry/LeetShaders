@@ -1,0 +1,11 @@
+{
+  "devCommand": "npm run dev",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/anthropic.ts": {
+      "maxDuration": 60
+    }
+  }
+}
+
