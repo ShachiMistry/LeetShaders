@@ -4,7 +4,7 @@
 // do not let tooling guess at older names from training data.
 
 import type { LLMJudgeFn, LLMJudgeInput, LLMJudgeOutput } from '../judge/types';
-import { JUDGE_MODEL, callAnthropic, type ContentBlock } from './anthropic';
+import { HINT_MODEL as JUDGE_MODEL, callAnthropic, type ContentBlock } from './anthropic';
 import { rgbaToPngBase64 } from './imageEncode';
 
 // Re-export from the shared client to keep a single source of truth.
