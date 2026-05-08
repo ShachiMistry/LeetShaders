@@ -178,6 +178,13 @@ export function render(program: WebGLProgram, uniforms: Uniforms = {}): Uint8Arr
 
   ctx.bindFramebuffer(ctx.FRAMEBUFFER, fbo);
   ctx.viewport(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Clear before every draw — otherwise the FBO retains the previous render's
+  // pixels. A shader that doesn't write fragColor would silently inherit the
+  // last frame's content and score 100 against the reference.
+  ctx.clearColor(0, 0, 0, 0);
+  ctx.clear(ctx.COLOR_BUFFER_BIT);
+
   ctx.useProgram(program);
   setUniforms(ctx, program, uniforms);
   ctx.drawArrays(ctx.TRIANGLES, 0, 3);
