@@ -7,8 +7,13 @@
 // To swap to Supabase Edge Functions later: rewrite this file in Deno syntax
 // and update PROXY_PATH in src/ai/anthropic.ts to the edge function URL.
 // The request/response contract is unchanged.
+//
+// Uses require() instead of import to ensure CJS compatibility with Vercel's
+// Node.js runtime, which conflicts with "type": "module" in the root package.json.
 
-import Anthropic from '@anthropic-ai/sdk';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 // Extend the default 10s limit — Opus vision calls can take 15–20s.
@@ -55,9 +60,10 @@ interface AnthropicCallOutput {
 
 // ─── Content block translation ────────────────────────────────────────────────
 
-function toSdkContentBlock(block: ContentBlock): Anthropic.MessageParam['content'][number] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toSdkContentBlock(block: ContentBlock): any {
   const cache = block.cacheControl === 'ephemeral'
-    ? ({ type: 'ephemeral' } as const)
+    ? { type: 'ephemeral' }
     : undefined;
 
   if (block.type === 'text') {
@@ -66,8 +72,7 @@ function toSdkContentBlock(block: ContentBlock): Anthropic.MessageParam['content
       : { type: 'text', text: block.text };
   }
 
-  // image
-  const imageBlock: Anthropic.ImageBlockParam = {
+  const imageBlock: Record<string, unknown> = {
     type: 'image',
     source: { type: 'base64', media_type: block.mediaType, data: block.base64 },
   };
@@ -121,10 +126,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return send(res, 400, { error: 'Invalid request body' });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
   const client = new Anthropic({ apiKey });
   const start = Date.now();
 
-  const sdkParams: Anthropic.MessageCreateParamsNonStreaming = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sdkParams: Record<string, any> = {
     model: body.model,
     system: body.system,
     max_tokens: body.maxTokens,
@@ -141,30 +148,31 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       {
         name: body.jsonSchema.name,
         description: body.jsonSchema.description,
-        input_schema: body.jsonSchema.schema as Anthropic.Tool['input_schema'],
+        input_schema: body.jsonSchema.schema,
       },
     ];
     sdkParams.tool_choice = { type: 'tool', name: body.jsonSchema.name };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   const message = await client.messages.create(sdkParams);
   const latencyMs = Date.now() - start;
 
-  // Extract content — tool_use block when jsonSchema was provided, text otherwise.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const msgContent: any[] = (message as any).content;
   let content: unknown;
   if (body.jsonSchema) {
-    const toolBlock = message.content.find((b) => b.type === 'tool_use') as
-      | Anthropic.ToolUseBlock
-      | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toolBlock = msgContent.find((b: any) => b.type === 'tool_use');
     content = toolBlock?.input ?? null;
   } else {
-    const textBlock = message.content.find((b) => b.type === 'text') as
-      | Anthropic.TextBlock
-      | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textBlock = msgContent.find((b: any) => b.type === 'text');
     content = textBlock?.text ?? '';
   }
 
-  const usage = message.usage as Anthropic.Usage & { cache_read_input_tokens?: number };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const usage: any = (message as any).usage;
 
   const output: AnthropicCallOutput = {
     content,
