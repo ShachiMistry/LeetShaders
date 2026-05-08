@@ -1,178 +1,94 @@
 // Vercel serverless proxy for Anthropic API calls.
-//
-// The browser client (src/ai/anthropic.ts) never holds ANTHROPIC_API_KEY.
-// It POSTs an AnthropicCallInput here; this function signs the request with
-// the server-side key and returns AnthropicCallOutput.
-//
-// To swap to Supabase Edge Functions later: rewrite this file in Deno syntax
-// and update PROXY_PATH in src/ai/anthropic.ts to the edge function URL.
-// The request/response contract is unchanged.
-//
-// Uses require() instead of import to ensure CJS compatibility with Vercel's
-// Node.js runtime, which conflicts with "type": "module" in the root package.json.
+// CJS only — no import statements. "type":"module" in root package.json is
+// overridden by api/package.json {"type":"commonjs"}.
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+/* eslint-disable @typescript-eslint/no-require-imports */
+const Anthropic = require('@anthropic-ai/sdk');
 
-import type { IncomingMessage, ServerResponse } from 'node:http';
-
-// maxDuration is declared in vercel.json (60s) — no export needed here.
-
-// ─── Request / response types (mirrors src/ai/anthropic.ts) ──────────────────
-
-interface TextContent {
-  type: 'text';
-  text: string;
-  cacheControl?: 'ephemeral';
-}
-
-interface ImageContent {
-  type: 'image';
-  mediaType: 'image/png' | 'image/jpeg';
-  base64: string;
-  cacheControl?: 'ephemeral';
-}
-
+interface TextContent { type: 'text'; text: string; cacheControl?: 'ephemeral' }
+interface ImageContent { type: 'image'; mediaType: string; base64: string; cacheControl?: 'ephemeral' }
 type ContentBlock = TextContent | ImageContent;
-
-interface JsonSchemaTool {
-  name: string;
-  description: string;
-  schema: Record<string, unknown>;
-}
-
+interface JsonSchemaTool { name: string; description: string; schema: Record<string, unknown> }
 interface AnthropicCallInput {
-  model: string;
-  system: string;
-  userContent: ContentBlock[];
-  maxTokens: number;
-  jsonSchema?: JsonSchemaTool;
+  model: string; system: string; userContent: ContentBlock[];
+  maxTokens: number; jsonSchema?: JsonSchemaTool;
 }
-
 interface AnthropicCallOutput {
-  content: unknown;
-  inputTokens: number;
-  outputTokens: number;
-  latencyMs: number;
-  cacheHit: boolean;
+  content: unknown; inputTokens: number; outputTokens: number;
+  latencyMs: number; cacheHit: boolean;
 }
 
-// ─── Content block translation ────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toSdkContentBlock(block: ContentBlock): any {
-  const cache = block.cacheControl === 'ephemeral'
-    ? { type: 'ephemeral' }
-    : undefined;
-
-  if (block.type === 'text') {
-    return cache
-      ? { type: 'text', text: block.text, cache_control: cache }
-      : { type: 'text', text: block.text };
-  }
-
-  const imageBlock: Record<string, unknown> = {
-    type: 'image',
-    source: { type: 'base64', media_type: block.mediaType, data: block.base64 },
-  };
-  if (cache) imageBlock.cache_control = cache;
-  return imageBlock;
-}
-
-// ─── Handler ──────────────────────────────────────────────────────────────────
-
-function send(res: ServerResponse, status: number, body: unknown): void {
-  const json = JSON.stringify(body);
+function send(res: any, status: number, body: unknown) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(json);
+  res.end(JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<AnthropicCallInput> {
+function readBody(req: any): Promise<AnthropicCallInput> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString()) as AnthropicCallInput);
-      } catch {
-        reject(new Error('Invalid JSON body'));
-      }
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+      catch { reject(new Error('bad json')); }
     });
     req.on('error', reject);
   });
 }
 
-module.exports = async function handler(req: IncomingMessage, res: ServerResponse) {
-  if (req.method !== 'POST') {
-    return send(res, 405, { error: 'Method not allowed' });
+function toBlock(block: ContentBlock): unknown {
+  const cache = block.cacheControl === 'ephemeral' ? { type: 'ephemeral' } : undefined;
+  if (block.type === 'text') {
+    return cache ? { type: 'text', text: block.text, cache_control: cache }
+                 : { type: 'text', text: block.text };
   }
+  const b: any = { type: 'image', source: { type: 'base64', media_type: block.mediaType, data: block.base64 } };
+  if (cache) b.cache_control = cache;
+  return b;
+}
+
+module.exports = async function handler(req: any, res: any) {
+  if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return send(res, 500, { error: 'ANTHROPIC_API_KEY is not configured' });
-  }
+  if (!apiKey) return send(res, 500, { error: 'ANTHROPIC_API_KEY is not configured' });
 
   let body: AnthropicCallInput;
   try {
-    // vercel pre-parses JSON onto req.body; raw Node streams do not.
-    const raw = (req as unknown as { body?: unknown }).body;
-    body = raw !== undefined ? (raw as AnthropicCallInput) : await readBody(req);
+    body = req.body ?? await readBody(req);
   } catch {
     return send(res, 400, { error: 'Invalid JSON body' });
   }
 
-  if (!body?.model || !body?.userContent || !body?.maxTokens) {
+  if (!body?.model || !body?.userContent || !body?.maxTokens)
     return send(res, 400, { error: 'Invalid request body' });
-  }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
   const client = new Anthropic({ apiKey });
   const start = Date.now();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sdkParams: Record<string, any> = {
+  const params: any = {
     model: body.model,
     system: body.system,
     max_tokens: body.maxTokens,
-    messages: [
-      {
-        role: 'user',
-        content: body.userContent.map(toSdkContentBlock),
-      },
-    ],
+    messages: [{ role: 'user', content: body.userContent.map(toBlock) }],
   };
 
   if (body.jsonSchema) {
-    sdkParams.tools = [
-      {
-        name: body.jsonSchema.name,
-        description: body.jsonSchema.description,
-        input_schema: body.jsonSchema.schema,
-      },
-    ];
-    sdkParams.tool_choice = { type: 'tool', name: body.jsonSchema.name };
+    params.tools = [{ name: body.jsonSchema.name, description: body.jsonSchema.description, input_schema: body.jsonSchema.schema }];
+    params.tool_choice = { type: 'tool', name: body.jsonSchema.name };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  const message = await client.messages.create(sdkParams);
+  const message = await client.messages.create(params);
   const latencyMs = Date.now() - start;
+  const msgContent: any[] = message.content;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const msgContent: any[] = (message as any).content;
   let content: unknown;
   if (body.jsonSchema) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolBlock = msgContent.find((b: any) => b.type === 'tool_use');
-    content = toolBlock?.input ?? null;
+    content = msgContent.find((b: any) => b.type === 'tool_use')?.input ?? null;
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const textBlock = msgContent.find((b: any) => b.type === 'text');
-    content = textBlock?.text ?? '';
+    content = msgContent.find((b: any) => b.type === 'text')?.text ?? '';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const usage: any = (message as any).usage;
-
+  const usage: any = message.usage;
   const output: AnthropicCallOutput = {
     content,
     inputTokens: usage.input_tokens,
@@ -182,4 +98,4 @@ module.exports = async function handler(req: IncomingMessage, res: ServerRespons
   };
 
   return send(res, 200, output);
-}
+};
