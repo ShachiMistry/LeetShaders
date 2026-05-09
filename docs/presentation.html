@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeetShaders — CMPE 280 Final</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #21262d;
+  --accent:  #58a6ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger:  #f85149;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --font-head: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-code: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-size: 16px;
+}
+
+#deck { position: fixed; inset: 0; background: var(--bg); }
+
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+  overflow: hidden;
+}
+.slide.active { opacity: 1; pointer-events: all; }
+
+.slide-inner {
+  width: 100%; max-width: 1000px;
+  margin: auto; padding: 44px 72px;
+  display: flex; flex-direction: column;
+  gap: 20px;
+}
+
+#nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 40px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 24px; gap: 12px;
+  background: rgba(13,17,23,0.85);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+#counter { font-family: var(--font-code); font-size: 0.75rem; color: var(--muted); }
+#nav button {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  width: 28px; height: 28px; border-radius: 4px; cursor: pointer;
+  font-size: 0.85rem; line-height: 1;
+  transition: border-color 0.15s, color 0.15s;
+}
+#nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+.slide-title {
+  font-family: var(--font-head); font-size: 2.2rem; font-weight: 700;
+  letter-spacing: -0.03em; color: var(--text); line-height: 1.15;
+}
+.section-label {
+  font-family: var(--font-code); font-size: 0.72rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.12em;
+}
+.presenter-label {
+  font-family: var(--font-code); font-size: 0.72rem; color: var(--accent);
+}
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 18px;
+}
+.card.accent-left { border-left: 3px solid var(--accent); }
+.card.warning-left { border-left: 3px solid var(--warning); }
+
+.tag {
+  display: inline-block;
+  font-family: var(--font-code); font-size: 0.7rem;
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 2px 8px; color: var(--muted);
+}
+.tag.easy    { border-color: var(--success); color: var(--success); }
+.tag.medium  { border-color: var(--warning); color: var(--warning); }
+.tag.hard    { border-color: var(--danger);  color: var(--danger);  }
+.tag.blue    { border-color: var(--accent);  color: var(--accent);  }
+
+.bullet-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.bullet-list li {
+  font-size: 0.92rem; color: var(--text); display: flex; align-items: baseline; gap: 8px;
+}
+.bullet-list li::before {
+  content: '>';
+  font-family: var(--font-code); font-size: 0.8rem;
+  color: var(--accent); flex-shrink: 0;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.metric-item {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 14px; text-align: center;
+}
+.metric-num {
+  font-family: var(--font-code); font-size: 1.9rem; font-weight: 500; color: var(--accent);
+  line-height: 1;
+}
+.metric-label { font-size: 0.72rem; color: var(--muted); margin-top: 5px; }
+
+.code-wrap pre {
+  border-radius: 4px; font-size: 0.73rem;
+  max-height: 260px; overflow-y: auto;
+}
+.code-wrap pre code { font-family: var(--font-code) !important; }
+.code-label {
+  font-family: var(--font-code); font-size: 0.68rem;
+  color: var(--muted); margin-bottom: 4px;
+}
+.hljs { background: #0d1117 !important; border: 1px solid var(--border); }
+
+.two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.two-col-60 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+@keyframes rings {
+  from { transform: scale(1); }
+  to   { transform: scale(1.25); }
+}
+
+.slide.active .slide-inner > * { animation: fadeIn 0.4s ease both; }
+.slide.active .slide-inner > *:nth-child(1) { animation-delay: 0.05s; }
+.slide.active .slide-inner > *:nth-child(2) { animation-delay: 0.12s; }
+.slide.active .slide-inner > *:nth-child(3) { animation-delay: 0.19s; }
+.slide.active .slide-inner > *:nth-child(4) { animation-delay: 0.26s; }
+.slide.active .slide-inner > *:nth-child(5) { animation-delay: 0.33s; }
+
+.cursor::after {
+  content: '_'; font-family: var(--font-code); color: var(--accent);
+  animation: blink 1s step-end infinite;
+}
+
+.ch-table { width: 100%; border-collapse: collapse; }
+.ch-table th {
+  font-family: var(--font-code); font-size: 0.68rem; color: var(--muted);
+  text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border);
+}
+.ch-table td {
+  font-size: 0.82rem; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text);
+}
+.ch-table tr:last-child td { border-bottom: none; }
+.ch-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+.arch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arch-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 7px 12px;
+  font-family: var(--font-code); font-size: 0.72rem; color: var(--text); white-space: nowrap;
+}
+.arch-box.accent { border-color: var(--accent); color: var(--accent); }
+.arch-box.success { border-color: var(--success); color: var(--success); }
+.arch-box.muted { border-color: var(--border); color: var(--muted); }
+.arch-arrow { color: var(--muted); font-family: var(--font-code); font-size: 0.85rem; }
+.arch-section {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.arch-section.highlighted { border-color: var(--accent); }
+.arch-row-label {
+  font-family: var(--font-code); font-size: 0.62rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;
+}
+
+.tree-node {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 7px 14px; font-family: var(--font-code); font-size: 0.74rem;
+  color: var(--text); white-space: nowrap;
+}
+.tree-node.pass { border-color: var(--success); color: var(--success); }
+.tree-node.fail { border-color: var(--danger); color: var(--danger); }
+.tree-node.llm  { border-color: var(--accent); color: var(--accent); }
+.tree-node.root { border-color: var(--warning); color: var(--warning); font-weight: 600; }
+.tree-conn { width: 1px; height: 12px; background: var(--border); }
+.tree-branch { display: flex; align-items: flex-start; gap: 24px; }
+.tree-branch-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.tree-branch-label {
+  font-family: var(--font-code); font-size: 0.62rem; color: var(--muted); margin-bottom: 3px;
+}
+
+.wireframe {
+  border: 1px solid var(--border); border-radius: 4px;
+  font-family: var(--font-code); font-size: 0.68rem; color: var(--muted); overflow: hidden;
+}
+.wf-header { background: var(--border); padding: 4px 10px; color: var(--muted); font-size: 0.65rem; }
+.wf-body { display: flex; }
+.wf-pane {
+  flex: 1; border-right: 1px solid var(--border); padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 3px; min-height: 64px;
+}
+.wf-pane:last-child { border-right: none; }
+.wf-pane-label { color: var(--accent); font-size: 0.62rem; }
+.wf-pane-sub { color: var(--muted); font-size: 0.58rem; }
+.wf-right { display: flex; flex-direction: column; flex: 1; }
+.wf-right-top, .wf-right-bot {
+  flex: 1; border-right: 1px solid var(--border); padding: 7px 9px;
+}
+.wf-right-top { border-bottom: 1px solid var(--border); }
+.wf-footer {
+  border-top: 1px solid var(--border); padding: 5px 9px;
+  display: flex; gap: 14px; color: var(--muted); font-size: 0.62rem;
+}
+
+.flow-steps { display: flex; flex-direction: column; gap: 0; }
+.flow-step { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.flow-step-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 6px 12px; font-family: var(--font-code); font-size: 0.72rem; color: var(--text); width: 100%;
+}
+.flow-step-box.stage1 { border-color: var(--success); }
+.flow-step-box.stage2 { border-color: var(--accent); }
+.flow-step-box.result { border-color: var(--warning); }
+.flow-step-box.db     { border-color: var(--muted); }
+.flow-conn { width: 1px; height: 10px; background: var(--border); margin: 0 0 0 12px; }
+
+.check-list { display: flex; flex-direction: column; gap: 7px; }
+.check-item { display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; color: var(--text); }
+.check-mark { color: var(--success); font-family: var(--font-code); font-size: 0.72rem; flex-shrink: 0; }
+
+.rule-list { display: flex; flex-direction: column; gap: 6px; }
+.rule-item {
+  font-family: var(--font-code); font-size: 0.72rem; color: var(--muted);
+  padding: 5px 9px; background: rgba(255,255,255,0.02); border-radius: 3px;
+  border-left: 2px solid var(--border);
+}
+.rule-item.ok { border-left-color: var(--success); }
+.rule-item.no { border-left-color: var(--danger); }
+
+.bg-rings { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.bg-rings::before, .bg-rings::after {
+  content: '';
+  position: absolute; border-radius: 50%; border: 1px solid var(--border);
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  animation: rings 8s ease-in-out infinite alternate;
+}
+.bg-rings::before { width: 600px; height: 600px; }
+.bg-rings::after  { width: 900px; height: 900px; animation-duration: 12s; }
+.ring3 {
+  position: absolute; border-radius: 50%; border: 1px solid rgba(33,38,45,0.5);
+  width: 1200px; height: 1200px;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  animation: rings 16s ease-in-out infinite alternate;
+}
+
+.hero-title {
+  font-family: var(--font-head); font-size: 5rem; font-weight: 700;
+  letter-spacing: -0.04em; color: var(--text); line-height: 1;
+}
+.hero-tagline { font-family: var(--font-code); font-size: 1rem; color: var(--muted); margin-top: 4px; }
+.hero-btn {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-code); font-size: 0.9rem;
+  color: var(--success); padding: 10px 20px;
+  border: 1px solid var(--success); border-radius: 4px;
+  background: rgba(63,185,80,0.08); margin-top: 8px; align-self: flex-start;
+}
+.name-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.name-pill {
+  font-family: var(--font-code); font-size: 0.72rem;
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 10px; color: var(--muted);
+}
+.name-pill strong { color: var(--text); }
+.hero-footer {
+  font-family: var(--font-code); font-size: 0.72rem; color: var(--border);
+  margin-top: auto; padding-bottom: 56px;
+}
+
+.quote-block {
+  border-left: 3px solid var(--accent); padding: 12px 18px;
+  background: rgba(88,166,255,0.05); border-radius: 0 4px 4px 0;
+  font-family: var(--font-body); font-size: 0.95rem; font-style: italic;
+  color: var(--text); line-height: 1.6;
+}
+
+.presenter-tag {
+  position: absolute; top: 14px; right: 72px;
+  font-family: var(--font-code); font-size: 0.65rem; color: var(--border);
+}
+
+.demo-line { font-family: var(--font-code); font-size: 0.78rem; color: var(--text); line-height: 1.7; }
+.demo-line .key { color: var(--muted); }
+.demo-line .val { color: var(--accent); }
+.demo-line .live { color: var(--success); }
+</style>
+</head>
+<body>
+<div id="deck">
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 1 — Title
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="bg-rings"><div class="ring3"></div></div>
+  <div class="slide-inner" style="justify-content:center;min-height:100vh;padding-bottom:60px;position:relative;z-index:1;">
+    <div>
+      <div class="hero-title">LeetShaders</div>
+      <div class="hero-tagline">LeetCode for Graphics Programming</div>
+    </div>
+    <div class="hero-btn">&gt; start_practicing<span class="cursor"></span></div>
+    <div class="name-pills">
+      <div class="name-pill"><strong>Neil Mewada</strong> &nbsp;·&nbsp; Judge &amp; Rendering</div>
+      <div class="name-pill"><strong>Eugene Lacatis</strong> &nbsp;·&nbsp; AI Systems</div>
+      <div class="name-pill"><strong>Parth Patel</strong> &nbsp;·&nbsp; Editor &amp; UI</div>
+      <div class="name-pill"><strong>Shachi Mistry</strong> &nbsp;·&nbsp; Content &amp; Backend</div>
+    </div>
+    <div class="hero-footer">CMPE 280 &nbsp;·&nbsp; SJSU &nbsp;·&nbsp; Spring 2026</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 2 — Problem + Architecture
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-inner">
+    <div class="section-label">the problem &amp; solution</div>
+    <div class="slide-title">Why is shader grading hard?</div>
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="quote-block">
+          "Same GLSL, different pixels on different machines. And a user can just sample the reference image to fool a pixel diff."
+        </div>
+        <ul class="bullet-list">
+          <li>GPU driver variance across Chrome, ANGLE, and Mesa</li>
+          <li>Adversarial submissions: hardcoded texture lookups pass pixel diff</li>
+          <li>No existing graded platform, Shadertoy is a playground</li>
+        </ul>
+        <div class="card accent-left" style="font-size:0.88rem;">
+          <strong>Solution: two-stage hybrid judge</strong><br>
+          <span style="color:var(--muted);font-size:0.82rem;">
+            Stage 1 &nbsp;<span class="tag easy">MAE ~5ms</span>&nbsp; fast pixel comparison &nbsp;+&nbsp;
+            Stage 2 &nbsp;<span class="tag blue">Claude Opus 4.7 ~8s</span>&nbsp; borderline only
+          </span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="arch-section">
+          <div class="arch-row-label">User layer</div>
+          <div class="arch-row">
+            <div class="arch-box success">Monaco Editor</div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-box success">LivePreview</div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-box success">Canvas</div>
+          </div>
+        </div>
+        <div class="arch-section highlighted">
+          <div class="arch-row-label" style="color:var(--accent);">Judge layer</div>
+          <div class="arch-row">
+            <div class="arch-box accent">pipeline.ts</div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-box accent">combiner.ts</div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-box">mae.ts</div>
+            <div class="arch-arrow" style="color:var(--muted);">|</div>
+            <div class="arch-box" style="border-color:var(--warning);color:var(--warning);">Claude 4.7</div>
+          </div>
+          <div style="font-family:var(--font-code);font-size:0.62rem;color:var(--muted);">One WebGL pipeline. No duplicates.</div>
+        </div>
+        <div class="arch-section">
+          <div class="arch-row-label">Data layer, Supabase Postgres</div>
+          <div class="arch-row">
+            <div class="arch-box muted">challenges</div>
+            <div class="arch-arrow" style="color:var(--border);">·</div>
+            <div class="arch-box muted">solves</div>
+            <div class="arch-arrow" style="color:var(--border);">·</div>
+            <div class="arch-box muted">judge_cache</div>
+            <div class="arch-arrow" style="color:var(--border);">·</div>
+            <div class="arch-box muted">api_telemetry</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 3 — Judge & Rendering: Pipeline + MAE
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Neil Mewada · Judge &amp; Rendering</div>
+  <div class="slide-inner">
+    <div class="section-label">01 · Judge &amp; Rendering · src/judge/</div>
+    <div class="slide-title">WebGL2 pipeline &amp; MAE scoring</div>
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <ul class="bullet-list">
+          <li>Singleton shared context, one canvas across the whole app</li>
+          <li>512×512 RGBA8 offscreen framebuffer, guaranteed color-renderable</li>
+          <li>Full-screen triangle trick, 3 vertices, zero buffer allocation</li>
+          <li>Context-loss recovery via <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">webglcontextrestored</span></li>
+          <li>2 000ms watchdog kills runaway shaders</li>
+        </ul>
+        <div class="card accent-left">
+          <div style="font-family:var(--font-code);font-size:0.82rem;color:var(--text);">
+            score = max(0, 100 − (mae / tolerance) × 100)
+          </div>
+          <div style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);margin-top:5px;">
+            5-tap GPU Gaussian pre-pass absorbs cross-driver variance.<br>
+            Sharp patterns (checkerboard) use no blur.
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="code-label">// VERT_SRC — pipeline.ts:7-14</div>
+        <div class="code-wrap">
+          <pre><code class="language-glsl">#version 300 es
+out vec2 v_uv;
+void main() {
+  // full-screen triangle, no VBO needed
+  float x = float(gl_VertexID & 1) * 4.0 - 1.0;
+  float y = float((gl_VertexID >> 1) & 1) * 4.0 - 1.0;
+  v_uv = vec2(x, y) * 0.5 + 0.5;
+  gl_Position = vec4(x, y, 0.0, 1.0);
+}</code></pre>
+        </div>
+        <div style="margin-top:10px;">
+          <table class="ch-table">
+            <thead><tr><th>Challenge</th><th>Tolerance</th><th>Blur</th></tr></thead>
+            <tbody>
+              <tr><td>Grandmaster's Grid</td><td><span class="tag easy">4.0</span></td><td>—</td></tr>
+              <tr><td>Zen Dot</td><td><span class="tag medium">10.0</span></td><td>✓</td></tr>
+              <tr><td>Orbital Geometry</td><td><span class="tag hard">20.0</span></td><td>✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 4 — Test Harness
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Neil Mewada · Judge &amp; Rendering</div>
+  <div class="slide-inner">
+    <div class="section-label">01 · Judge &amp; Rendering · src/judge/test/</div>
+    <div class="slide-title">Test harness &amp; risks</div>
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <table class="ch-table">
+          <thead><tr><th>Test case</th><th>Expected</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>Identical shaders</td><td><span class="tag easy">score: 100</span></td><td>✓</td></tr>
+            <tr><td>±0.01 offset variant</td><td>high, not 100</td><td>✓</td></tr>
+            <tr><td>Wildly different</td><td><span class="tag hard">score: low</span></td><td>✓</td></tr>
+            <tr><td>Compile error</td><td>ShaderError, no crash</td><td>✓</td></tr>
+            <tr><td>WEBGL_lose_context</td><td>recovery on restore</td><td>✓</td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="font-family:var(--font-code);font-size:0.72rem;color:var(--muted);">
+          Vitest suite CI-gated on <span style="color:var(--text);">main</span><br>
+          + standalone <span style="color:var(--accent);">manual.html</span> for visual inspection without React
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">Key risks</div>
+        <ul class="bullet-list" style="font-size:0.85rem;">
+          <li>GPU variance: same shader renders ±5 MAE across drivers. LLM stage absorbs this, MAE alone does not</li>
+          <li>Adversarial shaders: user samples reference texture. LLM reads source and flags it</li>
+          <li>LLM latency: every borderline submission is an API call. Cache aggressively by <span style="font-family:var(--font-code);font-size:0.78rem;">sha256(challenge + shader)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 5 — Challenge Bank
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Shachi Mistry · Content &amp; Backend</div>
+  <div class="slide-inner">
+    <div class="section-label">02 · Content &amp; Backend · src/challenges/</div>
+    <div class="slide-title">9 shader challenges</div>
+    <div class="two-col">
+      <div>
+        <table class="ch-table">
+          <thead><tr><th>Title</th><th>Difficulty</th><th>Tol</th><th>Blur</th></tr></thead>
+          <tbody>
+            <tr><td>Sky Blue</td><td><span class="tag easy">beginner</span></td><td>5.0</td><td>—</td></tr>
+            <tr><td>Grandmaster's Grid</td><td><span class="tag easy">beginner</span></td><td>4.0</td><td>—</td></tr>
+            <tr><td>Zen Dot</td><td><span class="tag easy">beginner</span></td><td>10.0</td><td>✓</td></tr>
+            <tr><td>The Rectangle Theorem</td><td><span class="tag easy">beginner</span></td><td>5.0</td><td>—</td></tr>
+            <tr><td>Cyan Horizon</td><td><span class="tag easy">beginner</span></td><td>8.0</td><td>✓</td></tr>
+            <tr><td>Spectrum Ring</td><td><span class="tag medium">intermediate</span></td><td>8.0</td><td>—</td></tr>
+            <tr><td>Neon Blossom</td><td><span class="tag medium">intermediate</span></td><td>12.0</td><td>✓</td></tr>
+            <tr><td>Cosmic Core</td><td><span class="tag medium">intermediate</span></td><td>10.0</td><td>✓</td></tr>
+            <tr><td>Orbital Geometry</td><td><span class="tag hard">advanced</span></td><td>20.0</td><td>✓</td></tr>
+          </tbody>
+        </table>
+        <div style="font-family:var(--font-code);font-size:0.68rem;color:var(--muted);margin-top:8px;">
+          Each challenge: .glsl reference · .json metadata · .md calibration doc
+        </div>
+      </div>
+      <div>
+        <div class="code-label">// circle-sdf.glsl</div>
+        <div class="code-wrap">
+          <pre><code class="language-glsl">void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0
+    - u_resolution.xy)
+    / min(u_resolution.y, u_resolution.x);
+
+  float d = length(uv) - 0.5;
+  float mask = 1.0
+    - smoothstep(-0.01, 0.01, d);
+
+  fragColor = vec4(vec3(mask), 1.0);
+}</code></pre>
+        </div>
+        <div class="card" style="margin-top:10px;font-family:var(--font-code);font-size:0.7rem;color:var(--muted);">
+          Tolerance calibration, not shader authoring, is the real work.<br>
+          Each .md records the tuning process and chosen values.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 6 — Backend: Schema + Auth + Hooks
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Shachi Mistry · Content &amp; Backend</div>
+  <div class="slide-inner">
+    <div class="section-label">02 · Content &amp; Backend · src/backend/</div>
+    <div class="slide-title">Schema, auth &amp; data hooks</div>
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">4 Supabase tables</div>
+        <div class="card" style="font-family:var(--font-code);font-size:0.75rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="border:1px solid var(--border);border-radius:3px;padding:8px;">
+              <div style="color:var(--text);">challenges</div>
+              <div style="color:var(--muted);font-size:0.65rem;margin-top:3px;">public read · 9 rows seeded</div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:3px;padding:8px;">
+              <div style="color:var(--text);">solves</div>
+              <div style="color:var(--muted);font-size:0.65rem;margin-top:3px;">users read+insert own rows</div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:3px;padding:8px;">
+              <div style="color:var(--text);">judge_cache</div>
+              <div style="color:var(--muted);font-size:0.65rem;margin-top:3px;">keyed by sha256(challenge+src)</div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:3px;padding:8px;">
+              <div style="color:var(--text);">api_telemetry</div>
+              <div style="color:var(--muted);font-size:0.65rem;margin-top:3px;">model, tokens, latency, cache_hit</div>
+            </div>
+          </div>
+        </div>
+        <ul class="bullet-list" style="font-size:0.85rem;">
+          <li>RLS on all 4 tables, no skipped policies</li>
+          <li><span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">npm run seed</span> upserts all .json files to DB</li>
+        </ul>
+        <div class="card warning-left" style="font-family:var(--font-code);font-size:0.72rem;">
+          <span style="color:var(--warning);">ANTHROPIC_API_KEY</span>
+          <span style="color:var(--muted);"> server-side only, never VITE_ prefixed.<br>Routed through Vercel serverless proxy.</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="code-label">// Hook API — Editor never imports supabase-js</div>
+        <div class="code-wrap">
+          <pre><code class="language-typescript">function useChallenges():
+  { data: Challenge[] | null;
+    loading: boolean;
+    error: Error | null }
+
+function useChallenge(slug: string):
+  { data: Challenge | null; loading: boolean }
+
+// Graceful fallback: if Supabase URL is
+// missing, serve LOCAL_CHALLENGES from disk
+const SUPABASE_CONFIGURED =
+  import.meta.env.VITE_SUPABASE_URL &&
+  !import.meta.env.VITE_SUPABASE_URL
+    .includes('placeholder');</code></pre>
+        </div>
+        <div class="card" style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);">
+          Local fallback means the app demos without any env vars configured.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 7 — Editor: Monaco + Layout
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Parth Patel · Editor &amp; UI</div>
+  <div class="slide-inner">
+    <div class="section-label">03 · Editor &amp; UI · src/editor/ · src/pages/</div>
+    <div class="slide-title">Monaco, GLSL syntax &amp; live preview</div>
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <ul class="bullet-list">
+          <li>GLSL is not a built-in Monaco language, registered via <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">registerGLSL()</span></li>
+          <li>Monarch tokenizer: keywords, built-ins, GL vars, control flow</li>
+          <li>Compile errors wired to <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">setModelMarkers</span> with line numbers</li>
+          <li>300ms debounced <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">onChange</span> feeds <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">pipeline.ts</span>, never a second context</li>
+          <li><span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">requestAnimationFrame</span> clock: both panels share <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">u_time</span></li>
+        </ul>
+        <div class="wireframe">
+          <div class="wf-header">ChallengePage.tsx, draggable split layout</div>
+          <div class="wf-body">
+            <div class="wf-pane" style="flex:1.4;">
+              <div class="wf-pane-label">Monaco Editor</div>
+              <div class="wf-pane-sub">GLSL · syntax highlight · error markers</div>
+            </div>
+            <div class="wf-right">
+              <div class="wf-right-top">
+                <div class="wf-pane-label">Your Output</div>
+                <div class="wf-pane-sub">live WebGL render</div>
+              </div>
+              <div class="wf-right-bot">
+                <div class="wf-pane-label">Reference</div>
+                <div class="wf-pane-sub">target image</div>
+              </div>
+            </div>
+          </div>
+          <div class="wf-footer">
+            <span>ErrorConsole (collapsible)</span>
+            <span>|</span>
+            <span>[Run] [Submit]</span>
+            <span>|</span>
+            <span>ResultPanel</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="code-label">// glsl-language.ts</div>
+        <div class="code-wrap">
+          <pre><code class="language-typescript">monaco.languages.register({ id: 'glsl' });
+monaco.languages.setMonarchTokensProvider(
+  'glsl', {
+    typeKeywords: [
+      'void','float','vec2','vec3','vec4',
+      'mat2','mat3','mat4','sampler2D',...
+    ],
+    builtins: [
+      'texture','mix','smoothstep',
+      'step','clamp','length','dot',...
+    ],
+    glVars: [
+      'gl_FragCoord','gl_FragColor',
+      'gl_Position',...
+    ],
+  }
+);</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 8 — Submit Flow + a11y
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Parth Patel · Editor &amp; UI</div>
+  <div class="slide-inner">
+    <div class="section-label">03 · Editor &amp; UI · submit flow · accessibility</div>
+    <div class="slide-title">Submit flow &amp; accessibility</div>
+    <div class="two-col">
+      <div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="flow-step-box">Click Submit</div>
+            <div class="flow-conn"></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-box">compileAndRender(userShader)</div>
+            <div class="flow-conn"></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-box stage1">Stage 1: "Running pixel comparison…"</div>
+            <div class="flow-conn"></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-box stage2">Stage 2: "Asking Claude for visual judgment…" <span style="color:var(--muted);font-size:0.65rem;">(borderline only)</span></div>
+            <div class="flow-conn"></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-box result">ResultPanel: score · pass/fail · LLM reasoning · latency</div>
+            <div class="flow-conn"></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-box db">submitSolve → Supabase solves table (if passed)</div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-code);font-size:0.68rem;color:var(--muted);margin-top:8px;">
+          Stage 2 latency: 3–8s, labeled explicitly and not hidden behind a spinner
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);margin-bottom:8px;">Accessibility checklist</div>
+        <div class="check-list">
+          <div class="check-item"><div class="check-mark">[✓]</div><div>Lighthouse a11y score ≥ 90</div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>WCAG 2.1 AA color contrast ≥ 4.5:1</div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>Pass/fail: icon + text label, not color alone</div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>All interactive elements keyboard navigable</div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>ARIA labels on icon-only buttons</div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>ErrorConsole: <span style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">role="region" aria-expanded</span></div></div>
+          <div class="check-item"><div class="check-mark">[✓]</div><div>Monaco keyboard nav preserved, no override</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 9 — AI: Band Logic Decision Tree
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Eugene Lacatis · AI Systems</div>
+  <div class="slide-inner">
+    <div class="section-label">04 · AI Systems · src/ai/bandLogic.ts</div>
+    <div class="slide-title">Hybrid judge decision tree</div>
+    <div class="two-col-60">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+        <div class="tree-node root">MAE Score (0–100)</div>
+        <div class="tree-conn"></div>
+        <div class="tree-branch">
+          <div class="tree-branch-col">
+            <div class="tree-branch-label">≥ 92 (upperBand)</div>
+            <div class="tree-node pass">Confident PASS</div>
+            <div class="tree-conn"></div>
+            <div class="tree-node pass" style="font-size:0.65rem;">skip LLM call</div>
+          </div>
+          <div class="tree-branch-col">
+            <div class="tree-branch-label">40–92 borderline</div>
+            <div class="tree-node llm">Call Claude Opus 4.7</div>
+            <div class="tree-conn"></div>
+            <div class="tree-branch" style="gap:16px;">
+              <div class="tree-branch-col">
+                <div class="tree-branch-label">flagged?</div>
+                <div class="tree-node fail">score = 0</div>
+                <div class="tree-conn"></div>
+                <div class="tree-node fail" style="font-size:0.65rem;">FAIL (cheat)</div>
+              </div>
+              <div class="tree-branch-col">
+                <div class="tree-branch-label">clean</div>
+                <div class="tree-node">0.5×MAE + 0.5×LLM</div>
+                <div class="tree-conn"></div>
+                <div class="tree-node" style="font-size:0.68rem;">≥80 → PASS · &lt;80 → FAIL</div>
+              </div>
+            </div>
+          </div>
+          <div class="tree-branch-col">
+            <div class="tree-branch-label">&lt; 40 (lowerBand)</div>
+            <div class="tree-node fail">Confident FAIL</div>
+            <div class="tree-conn"></div>
+            <div class="tree-node fail" style="font-size:0.65rem;">skip LLM call</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-family:var(--font-code);font-size:0.65rem;color:var(--muted);">
+          LLM unavailable → MAE-only fallback, banner shown in UI
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="code-label">// DEFAULT_BANDS — bandLogic.ts:29-35</div>
+        <div class="code-wrap">
+          <pre><code class="language-typescript">export const DEFAULT_BANDS: BandConfig = {
+  upperBand:     92,  // confident pass
+  lowerBand:     40,  // confident fail
+  maeWeight:    0.5,
+  llmWeight:    0.5,
+  passThreshold: 80,
+};</code></pre>
+        </div>
+        <div class="card accent-left" style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);">
+          LLM called for ~15–20% of submissions.<br>
+          Cost target: &lt;$20 per demo session.
+        </div>
+        <ul class="bullet-list" style="font-size:0.82rem;">
+          <li>Thresholds tuned against eval harness fixtures</li>
+          <li>Flagged = cheating, always fail, score 0</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 10 — AI: Judge Prompt + Eval
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Eugene Lacatis · AI Systems</div>
+  <div class="slide-inner">
+    <div class="section-label">04 · AI Systems · src/ai/judgePrompt.ts · eval/</div>
+    <div class="slide-title">LLM judge prompt &amp; eval harness</div>
+    <div class="two-col">
+      <div>
+        <div class="code-label">// JUDGE_SYSTEM_PROMPT — judgePrompt.ts:34-54</div>
+        <div class="code-wrap">
+          <pre><code class="language-plaintext">You are a fair, diagnostic judge for a
+GLSL shader learning platform.
+
+1. Score visual similarity 0-100. Be tolerant
+   of minor numeric or anti-alias drift caused
+   by GPU variance.
+2. Inspect the user's shader source for
+   cheating, e.g. sampling a hardcoded texture
+   of the reference, returning a pre-baked
+   color array, or otherwise not actually
+   computing the image. If detected: flagged=true.
+3. Provide a short diagnostic reasoning
+   sentence the UI can show. The user is
+   learning, feedback should be helpful,
+   not punitive.
+
+Return ONLY valid JSON:
+{ "visualMatchScore": number 0-100,
+  "flagged": boolean,
+  "passReasoning": string, ... }</code></pre>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <ul class="bullet-list">
+          <li>Model: <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--warning);">claude-opus-4-7</span></li>
+          <li>JSON enforced via <span style="font-family:var(--font-code);font-size:0.78rem;color:var(--accent);">tool_use</span>, no free-text parsing</li>
+          <li>Prompt caching on challenge desc + reference image</li>
+        </ul>
+        <div class="card">
+          <div style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);margin-bottom:8px;">Eval harness, src/ai/eval/</div>
+          <div class="metric-grid" style="grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="metric-item" style="padding:10px;">
+              <div class="metric-num" style="font-size:1.2rem;">4</div>
+              <div class="metric-label">fixture categories</div>
+            </div>
+            <div class="metric-item" style="padding:10px;">
+              <div class="metric-num" style="font-size:1.2rem;">&lt;10%</div>
+              <div class="metric-label">false-pass target</div>
+            </div>
+            <div class="metric-item" style="padding:10px;">
+              <div class="metric-num" style="font-size:1.2rem;">&lt;10%</div>
+              <div class="metric-label">false-fail target</div>
+            </div>
+            <div class="metric-item" style="padding:10px;">
+              <div class="metric-num" style="font-size:1.2rem;">$5</div>
+              <div class="metric-label">eval run ceiling</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-code);font-size:0.68rem;color:var(--muted);">
+          Fixture types: correct · almost-correct · wrong · adversarial
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 11 — AI: Hints, Caching, Telemetry
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="presenter-tag">Eugene Lacatis · AI Systems</div>
+  <div class="slide-inner">
+    <div class="section-label">04 · AI Systems · src/ai/hintPrompt.ts · cache.ts · telemetry.ts</div>
+    <div class="slide-title">Hints, caching &amp; telemetry</div>
+    <div class="three-col">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">Hint system</div>
+        <ul class="bullet-list" style="font-size:0.82rem;">
+          <li>Model: <span style="font-family:var(--font-code);font-size:0.72rem;color:var(--warning);">claude-sonnet-4-6</span></li>
+          <li>Rate limit: 3 hints / challenge / hour</li>
+          <li>"Nudge without revealing"</li>
+        </ul>
+        <div class="rule-list">
+          <div class="rule-item ok">✓ Point at concepts, not lines</div>
+          <div class="rule-item ok">✓ Diagnose the visual delta</div>
+          <div class="rule-item ok">✓ Ask leading questions</div>
+          <div class="rule-item no">✗ No code snippets in hints</div>
+          <div class="rule-item no">✗ Max ~80 words</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">Caching</div>
+        <div class="code-wrap">
+          <pre><code class="language-typescript">// Same shader → same hint
+const key = cacheKey(
+  challenge.id,
+  await shaderHash(src)
+);
+const cached = await cache.get(key);
+if (cached !== null) {
+  return {
+    hint: cached,
+    cacheHit: true
+  };
+}</code></pre>
+        </div>
+        <div style="font-family:var(--font-code);font-size:0.68rem;color:var(--muted);">
+          sha256(challengeId + shaderSrc)
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--accent);">Telemetry</div>
+        <ul class="bullet-list" style="font-size:0.82rem;">
+          <li>Every LLM call logs model, tokens, latency, cache_hit</li>
+          <li>3 swappable sinks:</li>
+        </ul>
+        <div class="rule-list">
+          <div class="rule-item">MemorySink — tests</div>
+          <div class="rule-item">ConsoleSink — dev</div>
+          <div class="rule-item ok">SupabaseSink — prod</div>
+        </div>
+        <div class="card" style="font-family:var(--font-code);font-size:0.68rem;color:var(--muted);">
+          api_telemetry answers:<br>"What does this cost to run?"<br>
+          Sink failure never breaks submit flow.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 12 — Live Demo
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-inner" style="justify-content:center;min-height:calc(100vh - 40px);text-align:center;align-items:center;">
+    <div style="font-family:var(--font-code);font-size:2.5rem;color:var(--accent);margin-bottom:28px;">&gt; demo_time<span class="cursor"></span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:left;width:100%;">
+      <div class="card">
+        <div style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);margin-bottom:10px;">// try a challenge</div>
+        <div class="demo-line"><span class="key">&gt; </span>solve checkerboard</div>
+        <div class="demo-line"><span class="key">  title:  </span><span class="val">Grandmaster's Grid</span></div>
+        <div class="demo-line"><span class="key">  diff:   </span><span class="val">beginner</span></div>
+        <div class="demo-line"><span class="key">  tol:    </span><span class="val">4.0</span></div>
+        <div class="demo-line"><span class="key">  blur:   </span><span class="val">false</span></div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);margin-bottom:10px;">// submit &amp; judge</div>
+        <div class="demo-line"><span class="key">&gt; </span>submit shader</div>
+        <div class="demo-line"><span class="key">  Stage 1 </span>MAE…</div>
+        <div class="demo-line"><span class="key">  Stage 2 </span>Claude…</div>
+        <div class="demo-line"><span class="key">  Score:  </span><span class="live">[ live ]</span></div>
+        <div class="demo-line"><span class="key">  Passed: </span><span class="live">[ live ]</span></div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--font-code);font-size:0.7rem;color:var(--muted);margin-bottom:10px;">// links</div>
+        <div class="demo-line"><span class="key">&gt; </span><span style="color:var(--accent);">github.com/ShachiMistry/LeetShaders</span></div>
+        <div class="demo-line"><span class="key">&gt; </span><span style="color:var(--success);">Vercel preview deploy</span></div>
+        <div class="demo-line" style="margin-top:10px;"><span class="key">  </span>CMPE 280 · Spring 2026</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 13 — Results & Closing
+══════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-inner">
+    <div class="section-label">results</div>
+    <div class="slide-title">What we built</div>
+    <div class="metric-grid">
+      <div class="metric-item"><div class="metric-num">9</div><div class="metric-label">Challenges shipped</div></div>
+      <div class="metric-item"><div class="metric-num">3</div><div class="metric-label">Difficulty tiers</div></div>
+      <div class="metric-item"><div class="metric-num">1</div><div class="metric-label">WebGL pipeline (shared)</div></div>
+      <div class="metric-item"><div class="metric-num">&lt;10%</div><div class="metric-label">Target false-pass rate</div></div>
+      <div class="metric-item"><div class="metric-num">≥90</div><div class="metric-label">Lighthouse a11y</div></div>
+      <div class="metric-item"><div class="metric-num">4</div><div class="metric-label">Eval fixture categories</div></div>
+    </div>
+    <ul class="bullet-list">
+      <li>Browser-native WebGL2 judge, no server GPU needed</li>
+      <li>Hybrid judge: MAE fast-path + Claude Opus 4.7 vision fallback</li>
+      <li>Monaco editor with custom GLSL tokenizer, inline error annotations</li>
+      <li>Supabase RLS + Vercel serverless API proxy</li>
+      <li>Eval harness: correct · almost-correct · wrong · adversarial fixtures</li>
+    </ul>
+    <div style="border-top:1px solid var(--border);padding-top:14px;">
+      <div class="name-pills">
+        <div class="name-pill"><strong>Neil Mewada</strong> &nbsp;·&nbsp; Judge &amp; Rendering</div>
+        <div class="name-pill"><strong>Eugene Lacatis</strong> &nbsp;·&nbsp; AI Systems</div>
+        <div class="name-pill"><strong>Parth Patel</strong> &nbsp;·&nbsp; Editor &amp; UI</div>
+        <div class="name-pill"><strong>Shachi Mistry</strong> &nbsp;·&nbsp; Content &amp; Backend</div>
+      </div>
+      <div style="font-family:var(--font-code);font-size:0.72rem;color:var(--muted);margin-top:10px;">
+        github.com/ShachiMistry/LeetShaders &nbsp;·&nbsp; CMPE 280 · SJSU · Spring 2026
+      </div>
+      <div style="font-family:var(--font-head);font-size:1.4rem;font-weight:600;color:var(--muted);margin-top:14px;">
+        Thank you. Questions?
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end #deck -->
+
+<div id="nav">
+  <span id="counter">1 / 13</span>
+  <button id="prev" aria-label="Previous slide">&#8592;</button>
+  <button id="next" aria-label="Next slide">&#8594;</button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  hljs.highlightAll();
+
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const counter = document.getElementById('counter');
+  let current = 0;
+
+  function go(n) {
+    slides[current].classList.remove('active');
+    current = ((n % slides.length) + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+  }
+
+  document.getElementById('prev').addEventListener('click', () => go(current - 1));
+  document.getElementById('next').addEventListener('click', () => go(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(current - 1);
+  });
+
+  document.getElementById('deck').addEventListener('click', (e) => {
+    if (!e.target.closest('pre') && !e.target.closest('button') && !e.target.closest('a')) {
+      go(current + 1);
+    }
+  });
+
+  slides[0].classList.add('active');
+});
+</script>
+</body>
+</html>
